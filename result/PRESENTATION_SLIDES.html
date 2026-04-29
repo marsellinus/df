@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Forensics: Unauthorized Data Exfiltration Investigation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+        .slides-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .slide {
+            width: 90%;
+            max-width: 1000px;
+            height: 90vh;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 60px;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            animation: slideIn 0.5s ease-in-out;
+            overflow-y: auto;
+        }
+        .slide.active { display: flex; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        .slide h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            border-bottom: 4px solid #667eea;
+            padding-bottom: 15px;
+        }
+        .slide h2 {
+            color: #667eea;
+            font-size: 2.2em;
+            margin-bottom: 30px;
+            border-left: 6px solid #667eea;
+            padding-left: 20px;
+        }
+        .slide h3 {
+            color: #764ba2;
+            font-size: 1.4em;
+            margin: 20px 0 10px 0;
+        }
+        .slide p, .slide li {
+            font-size: 1.2em;
+            line-height: 1.8;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .slide ul, .slide ol {
+            margin-left: 40px;
+            margin-bottom: 20px;
+        }
+        .slide li { margin-bottom: 15px; }
+        .title-slide {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            justify-content: space-around;
+            text-align: center;
+        }
+        .title-slide h1 {
+            font-size: 3.5em;
+            color: white;
+            border: none;
+            padding: 0;
+            margin: 0;
+        }
+        .title-slide h2 {
+            font-size: 1.8em;
+            color: #e8d5f2;
+            border: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+        .title-slide .meta {
+            color: rgba(255,255,255,0.9);
+            font-size: 1.1em;
+        }
+        .data-box {
+            background: #f0f4ff;
+            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .critical-box {
+            background: #ffe8e8;
+            border-left: 5px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            color: #721c24;
+        }
+        .chart {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .chart-bar {
+            display: inline-block;
+            width: 60px;
+            background: #667eea;
+            margin: 0 10px;
+            vertical-align: bottom;
+            text-align: center;
+            border-radius: 3px 3px 0 0;
+            color: white;
+            padding-top: 10px;
+        }
+        .timeline {
+            margin: 20px 0;
+        }
+        .timeline-item {
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin: 10px 0;
+            background: #f9f9f9;
+            border-radius: 3px;
+        }
+        .timeline-item strong { color: #667eea; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 1em;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        button {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #667eea;
+            color: white;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .slide-counter {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            color: #667eea;
+            z-index: 100;
+        }
+        .highlight { background: #fffacd; font-weight: bold; }
+        .severity-critical { color: #dc3545; font-weight: bold; }
+        .severity-high { color: #ff9800; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="slides-container">
+    <!-- Slide 1: Title -->
+    <div class="slide title-slide active">
+        <h1>Digital Forensics Research</h1>
+        <h2>Unauthorized Data Exfiltration Investigation in MinIO Cloud Storage</h2>
+        <div class="meta">
+            <p>Research-Based Project Investigation</p>
+            <p>April 21, 2026</p>
+        </div>
+    </div>
+
+    <!-- Slide 2: Investigation Overview -->
+    <div class="slide">
+        <h2>Incident Overview</h2>
+        <div class="critical-box">
+            <h3 style="margin-top: 0;">🚨 Critical Security Breach</h3>
+            <p><strong>Attack Type:</strong> Bulk Data Download & Sensitive File Access</p>
+            <p><strong>Duration:</strong> 3 seconds (13:40:18 - 13:40:21 UTC)</p>
+            <p><strong>Files Compromised:</strong> 5 critical business assets</p>
+            <p><strong>Bytes Exfiltrated:</strong> ~2.5 GB</p>
+        </div>
+        <div class="data-box">
+            <h3 style="margin-top: 0;">Attack Scope</h3>
+            <p><strong>Target:</strong> MinIO v2025-09-07 (S3-compatible storage)</p>
+            <p><strong>Bucket:</strong> foresc (production data)</p>
+            <p><strong>Source IP:</strong> 108.97.44.37</p>
+            <p><strong>Attacker:</strong> attacker1 (unauthorized user)</p>
+        </div>
+    </div>
+
+    <!-- Slide 3: Compromised Assets -->
+    <div class="slide">
+        <h2>Compromised Assets</h2>
+        <table>
+            <tr>
+                <th>File Name</th>
+                <th>Type</th>
+                <th>Classification</th>
+            </tr>
+            <tr>
+                <td>financial_report_2024.xlsx</td>
+                <td>Spreadsheet</td>
+                <td><span class="severity-critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+                <td>technical_architecture.pdf</td>
+                <td>Document</td>
+                <td><span class="severity-critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+                <td>customer_database.csv</td>
+                <td>DB Export</td>
+                <td><span class="severity-critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+                <td>api_keys.txt</td>
+                <td>Config</td>
+                <td><span class="severity-critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+                <td>private_certificates.pem</td>
+                <td>Crypto Material</td>
+                <td><span class="severity-critical">CRITICAL</span></td>
+            </tr>
+        </table>
+        <div class="data-box">
+            <p><strong>Impact:</strong> Financial fraud risk, IP exposure, PII breach (10K+ customers), lateral movement capability, encryption compromise</p>
+        </div>
+    </div>
+
+    <!-- Slide 4: Forensic Framework -->
+    <div class="slide">
+        <h2>Investigation Framework</h2>
+        <h3>Multi-Layer Forensic Architecture</h3>
+        <div style="margin: 30px 0;">
+            <div style="background: #e3f2fd; padding: 15px; margin: 10px 0; border-radius: 5px;">
+                <strong>📊 Log Collection Layer (Port 5000)</strong><br>
+                Real-time capture of all MinIO S3 API calls
+            </div>
+            <div style="background: #f3e5f5; padding: 15px; margin: 10px 0; border-radius: 5px;">
+                <strong>🔍 Analysis Layer (Port 5001)</strong><br>
+                Forensic analyzer with 5 anomaly detection algorithms
+            </div>
+            <div style="background: #e8f5e9; padding: 15px; margin: 10px 0; border-radius: 5px;">
+                <strong>📈 Dashboard Layer (Port 5002)</strong><br>
+                Visualization and reporting system
+            </div>
+            <div style="background: #fce4ec; padding: 15px; margin: 10px 0; border-radius: 5px;">
+                <strong>💾 Storage Layer</strong><br>
+                SQLite3 forensic database with 3 tables (logs, anomalies, timeline)
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: Detection Algorithms -->
+    <div class="slide">
+        <h2>Anomaly Detection Algorithms</h2>
+        <div class="data-box" style="margin-top: 20px;">
+            <h3 style="margin-top: 0;">1️⃣ Bulk Download Detection</h3>
+            <p>Identifies rapid sequential file access (threshold: 5+ files/hour)</p>
+            <p><strong>Detected:</strong> 37 anomalies</p>
+        </div>
+        <div class="data-box">
+            <h3 style="margin-top: 0;">2️⃣ Sensitive File Access</h3>
+            <p>Flags access to monitored critical assets</p>
+            <p><strong>Detected:</strong> 57 anomalies</p>
+        </div>
+        <div class="data-box">
+            <h3 style="margin-top: 0;">3️⃣ Multi-IP Detection</h3>
+            <p>Detects access from multiple IPs within short timeframe (3+ IPs/hour)</p>
+            <p><strong>Detected:</strong> 12 anomalies</p>
+        </div>
+    </div>
+
+    <!-- Slide 6: Attack Timeline -->
+    <div class="slide">
+        <h2>Attack Timeline - 3 Second Exfiltration</h2>
+        <div class="timeline">
+            <div class="timeline-item">
+                <strong>13:40:18.0</strong> - Initial access from 108.97.44.37
+            </div>
+            <div class="timeline-item">
+                <strong>13:40:18.6</strong> - financial_report_2024.xlsx extracted
+            </div>
+            <div class="timeline-item">
+                <strong>13:40:18.9</strong> - technical_architecture.pdf transmitted
+            </div>
+            <div class="timeline-item">
+                <strong>13:40:19.2</strong> - customer_database.csv downloaded
+            </div>
+            <div class="timeline-item">
+                <strong>13:40:19.5</strong> - api_keys.txt obtained
+            </div>
+            <div class="timeline-item">
+                <strong>13:40:20.1</strong> - private_certificates.pem exfiltrated
+            </div>
+            <div class="timeline-item">
+                <strong>13:40:21.0</strong> - Attack complete (3 second total duration)
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Forensic Findings -->
+    <div class="slide">
+        <h2>Forensic Analysis Results</h2>
+        <div class="chart" style="margin: 30px 0;">
+            <h3>Detected Anomalies by Type</h3>
+            <div style="height: 300px; display: flex; align-items: flex-end; justify-content: center; gap: 30px;">
+                <div style="text-align: center;">
+                    <div class="chart-bar" style="height: 250px;">37</div>
+                    <p><strong>Bulk Download</strong><br><span class="severity-high">HIGH</span></p>
+                </div>
+                <div style="text-align: center;">
+                    <div class="chart-bar" style="height: 300px; background: #dc3545;">57</div>
+                    <p><strong>Sensitive Access</strong><br><span class="severity-critical">CRITICAL</span></p>
+                </div>
+                <div style="text-align: center;">
+                    <div class="chart-bar" style="height: 80px;">12</div>
+                    <p><strong>Multi-IP</strong><br><span class="severity-high">HIGH</span></p>
+                </div>
+            </div>
+            <p><strong>Total Anomalies: 106</strong></p>
+        </div>
+    </div>
+
+    <!-- Slide 8: Evidence of Premeditation -->
+    <div class="slide">
+        <h2>Evidence of Premeditation</h2>
+        <h3>🎯 Indicators of Planned Attack</h3>
+        <ul>
+            <li><strong>File Knowledge:</strong> Accessed specific files in priority order without exploration</li>
+            <li><strong>Rapid Extraction:</strong> ~500MB+ files transferred in seconds (high-bandwidth connection)</li>
+            <li><strong>Valid Credentials:</strong> Access granted using known account (credential theft/compromise)</li>
+            <li><strong>Targeting Precision:</strong> Only critical assets accessed; no random exploration</li>
+            <li><strong>Automated Tooling:</strong> Consistent 600ms timing intervals suggest scripted attack</li>
+        </ul>
+        <div class="critical-box" style="margin-top: 20px;">
+            <strong>Conclusion:</strong> Attack demonstrates sophisticated threat actor with advance reconnaissance and automated tooling. Suggests insider threat or prior system compromise.
+        </div>
+    </div>
+
+    <!-- Slide 9: Business Impact -->
+    <div class="slide">
+        <h2>Business Impact Assessment</h2>
+        <h3>🔴 Immediate Risks</h3>
+        <ul>
+            <li><span class="highlight">Financial Fraud:</span> Revenue forecasts and fiscal data exposed</li>
+            <li><span class="highlight">IP Theft:</span> Technical architecture and design documentation compromised</li>
+            <li><span class="highlight">Customer PII Breach:</span> 10,000+ customer records potentially for sale on dark web</li>
+            <li><span class="highlight">Lateral Movement:</span> API keys enable access to third-party systems</li>
+            <li><span class="highlight">Encryption Compromise:</span> Private keys enable decryption and MITM attacks</li>
+        </ul>
+        <div class="critical-box" style="margin-top: 20px;">
+            <strong>Regulatory Impact:</strong> GDPR violation (~€20M+), CCPA violation, potential class action lawsuits, mandatory breach notification
+        </div>
+    </div>
+
+    <!-- Slide 10: Immediate Recommendations -->
+    <div class="slide">
+        <h2>Immediate Actions (0-24 hours)</h2>
+        <h3>🚨 Critical Response Steps</h3>
+        <ul>
+            <li><strong>Revoke Credentials:</strong> Disable 'attacker1' account and all leaked API keys</li>
+            <li><strong>Block Attacker:</strong> Firewall block for IP 108.97.44.37</li>
+            <li><strong>Certificate Reissue:</strong> Invalidate and reissue all SSL/TLS certificates</li>
+            <li><strong>Customer Notification:</strong> Initiate mandatory breach notification protocol</li>
+            <li><strong>Law Enforcement:</strong> File incident report with FBI/cybercrime authorities</li>
+            <li><strong>Incident Response:</strong> Activate full security incident response team</li>
+        </ul>
+    </div>
+
+    <!-- Slide 11: Short-term Recommendations -->
+    <div class="slide">
+        <h2>Short-term Actions (1-7 days)</h2>
+        <h3>🛡️ Stabilization Phase</h3>
+        <ul>
+            <li><strong>Access Control Audit:</strong> Review all MinIO policies and IAM configurations</li>
+            <li><strong>Monitoring Deployment:</strong> Implement anomaly detection for bulk operations</li>
+            <li><strong>Log Protection:</strong> Enable immutable logging with 90+ day retention</li>
+            <li><strong>Multi-factor Authentication:</strong> Enforce MFA for all sensitive accounts</li>
+            <li><strong>Network Segmentation:</strong> Isolate storage systems from public internet</li>
+        </ul>
+    </div>
+
+    <!-- Slide 12: Long-term Recommendations -->
+    <div class="slide">
+        <h2>Long-term Actions (1-3 months)</h2>
+        <h3>🏗️ Infrastructure Hardening</h3>
+        <ul>
+            <li><strong>Data Classification:</strong> Implement formal classification for sensitive assets</li>
+            <li><strong>Encryption at Rest:</strong> Deploy AES-256 encryption for critical objects</li>
+            <li><strong>Persistent Monitoring:</strong> Deploy forensic framework as permanent security component</li>
+            <li><strong>Threat Hunting:</strong> Search for additional compromise indicators and persistence mechanisms</li>
+            <li><strong>Security Training:</strong> Implement credential security and phishing awareness training</li>
+        </ul>
+    </div>
+
+    <!-- Slide 13: Conclusion -->
+    <div class="slide" style="justify-content: space-around;">
+        <h2>Conclusion & Key Takeaways</h2>
+        <div class="critical-box">
+            <h3 style="margin-top: 0;">Investigation Status: ACTIVE BREACH</h3>
+            <p>106 anomalous events detected. 5 critical files exfiltrated. Attack timeline reconstructed with precision.</p>
+        </div>
+        <div class="data-box">
+            <h3 style="margin-top: 0;">Key Findings</h3>
+            <ul style="list-style: none; padding: 0; margin: 0;">
+                <li>✅ Comprehensive forensic evidence collected</li>
+                <li>✅ Attack methodology documented</li>
+                <li>✅ Threat actor profile identified</li>
+                <li>✅ Business impact assessed</li>
+                <li>✅ Remediation roadmap established</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Slide 14: Questions -->
+    <div class="slide title-slide">
+        <h1>Questions & Discussion</h1>
+        <h2>Digital Forensics Research Investigation</h2>
+        <p style="font-size: 1.3em; margin-top: 40px;">Project completed: April 21, 2026<br>Investigation ID: DF-2026-001</p>
+    </div>
+</div>
+
+<div class="slide-counter">
+    <span id="current">1</span> / <span id="total">14</span>
+</div>
+
+<div class="controls">
+    <button id="prev" onclick="previousSlide()">← Previous</button>
+    <button id="next" onclick="nextSlide()">Next →</button>
+</div>
+
+<script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    
+    function showSlide(n) {
+        slides.forEach(slide => slide.classList.remove('active'));
+        slides[n].classList.add('active');
+        document.getElementById('current').textContent = n + 1;
+        document.getElementById('prev').disabled = n === 0;
+        document.getElementById('next').disabled = n === totalSlides - 1;
+    }
+    
+    function nextSlide() {
+        if (currentSlide < totalSlides - 1) {
+            currentSlide++;
+            showSlide(currentSlide);
+        }
+    }
+    
+    function previousSlide() {
+        if (currentSlide > 0) {
+            currentSlide--;
+            showSlide(currentSlide);
+        }
+    }
+    
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') nextSlide();
+        if (e.key === 'ArrowLeft') previousSlide();
+    });
+    
+    document.getElementById('total').textContent = totalSlides;
+    showSlide(0);
+</script>
+
+</body>
+</html>

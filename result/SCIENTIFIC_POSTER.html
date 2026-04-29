@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Forensics Poster</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .poster {
+            width: 36in;
+            height: 48in;
+            background: white;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.2);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto auto auto;
+            gap: 20px;
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+        .header {
+            grid-column: 1 / 3;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header h2 {
+            font-size: 1.8em;
+            font-weight: 300;
+            margin-bottom: 5px;
+        }
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            border: 2px solid #667eea;
+        }
+        .section h3 {
+            color: #667eea;
+            font-size: 1.6em;
+            margin-bottom: 15px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .overview {
+            grid-column: 1;
+            grid-row: 2;
+        }
+        .methodology {
+            grid-column: 2;
+            grid-row: 2;
+        }
+        .findings {
+            grid-column: 1;
+            grid-row: 3;
+        }
+        .impact {
+            grid-column: 2;
+            grid-row: 3;
+        }
+        .timeline {
+            grid-column: 1 / 3;
+            grid-row: 4;
+        }
+        .recommendations {
+            grid-column: 1 / 3;
+            grid-row: 5;
+            background: #e8f5e9;
+            border-color: #28a745;
+        }
+        .recommendations h3 {
+            color: #28a745;
+            border-bottom-color: #28a745;
+        }
+        .section p, .section li {
+            font-size: 0.95em;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .section ul {
+            margin-left: 20px;
+        }
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2.2em;
+            font-weight: bold;
+            display: block;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+        .critical-box {
+            background: #ffe8e8;
+            border-left: 5px solid #dc3545;
+            padding: 12px;
+            border-radius: 3px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .timeline-horizontal {
+            display: flex;
+            gap: 5px;
+            margin: 15px 0;
+            align-items: center;
+        }
+        .timeline-step {
+            background: #667eea;
+            color: white;
+            padding: 10px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+        .timeline-step::after {
+            content: '→';
+            position: absolute;
+            right: -12px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+        .timeline-step:last-child::after {
+            content: '';
+        }
+        .anomaly-type {
+            background: white;
+            border: 2px solid #667eea;
+            padding: 10px;
+            border-radius: 3px;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        .anomaly-count {
+            font-weight: bold;
+            color: #667eea;
+        }
+        table {
+            width: 100%;
+            font-size: 0.85em;
+            margin: 10px 0;
+            border-collapse: collapse;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        .footer {
+            grid-column: 1 / 3;
+            text-align: center;
+            font-size: 0.85em;
+            color: #666;
+            border-top: 2px solid #ddd;
+            padding-top: 15px;
+        }
+        .badge {
+            display: inline-block;
+            background: #dc3545;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        @media print {
+            body { background: white; padding: 0; }
+            .poster { box-shadow: none; margin: 0; }
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .comparison-box {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 3px;
+            background: #f9f9f9;
+        }
+        .comparison-box strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="poster">
+    <!-- Header -->
+    <div class="header">
+        <h1>🔍 Digital Forensics Investigation</h1>
+        <h2>Unauthorized Data Exfiltration in MinIO Cloud Storage</h2>
+        <p>Research-Based Project | April 21, 2026 | Investigation ID: DF-2026-001</p>
+    </div>
+
+    <!-- Overview Section -->
+    <div class="section overview">
+        <h3>📋 Incident Overview</h3>
+        <div class="stat-box">
+            <span class="stat-number">3</span>
+            <span class="stat-label">Second Attack Duration</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-number">5</span>
+            <span class="stat-label">Critical Files Exfiltrated</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-number">~2.5GB</span>
+            <span class="stat-label">Data Compromised</span>
+        </div>
+        <div class="critical-box">
+            <span class="badge">CRITICAL</span><strong>Severity:</strong> Active Breach
+        </div>
+        <p><strong>Attacker:</strong> attacker1 (108.97.44.37)</p>
+        <p><strong>Target:</strong> MinIO foresc bucket</p>
+        <p><strong>Attack Type:</strong> Bulk download with credential abuse</p>
+    </div>
+
+    <!-- Methodology Section -->
+    <div class="section methodology">
+        <h3>🔬 Forensic Framework</h3>
+        <p><strong>Multi-layer detection architecture:</strong></p>
+        <ul>
+            <li>Real-time log collection (Port 5000)</li>
+            <li>Forensic analysis engine (Port 5001)</li>
+            <li>Visualization dashboard (Port 5002)</li>
+            <li>SQLite forensic database</li>
+        </ul>
+        <p style="margin-top: 15px;"><strong>Detection Algorithms:</strong></p>
+        <ul>
+            <li>Bulk download pattern recognition</li>
+            <li>Sensitive file access monitoring</li>
+            <li>Multi-IP correlation analysis</li>
+            <li>Unusual hours detection</li>
+        </ul>
+        <p style="margin-top: 15px; color: #667eea; font-weight: bold;">Total Events: 106 | Anomalies: 106</p>
+    </div>
+
+    <!-- Findings Section -->
+    <div class="section findings">
+        <h3>📊 Forensic Findings</h3>
+        <p><strong>Anomaly Breakdown:</strong></p>
+        <div class="anomaly-type">
+            <span class="anomaly-count">37</span> BULK_DOWNLOAD anomalies <span class="badge">HIGH</span>
+        </div>
+        <div class="anomaly-type">
+            <span class="anomaly-count">57</span> SENSITIVE_FILE_ACCESS <span class="badge">CRITICAL</span>
+        </div>
+        <div class="anomaly-type">
+            <span class="anomaly-count">12</span> MULTIPLE_IP_ADDRESSES <span class="badge">HIGH</span>
+        </div>
+        <p style="margin-top: 15px;"><strong>Attack Indicators:</strong></p>
+        <ul>
+            <li>✓ File knowledge (no exploration)</li>
+            <li>✓ Rapid extraction pattern</li>
+            <li>✓ Valid credentials used</li>
+            <li>✓ Automated tooling evidence</li>
+            <li>✓ Premeditated targeting</li>
+        </ul>
+    </div>
+
+    <!-- Impact Section -->
+    <div class="section impact">
+        <h3>⚠️ Business Impact</h3>
+        <p><strong>Compromised Assets:</strong></p>
+        <table>
+            <tr>
+                <th>Asset</th>
+                <th>Risk</th>
+            </tr>
+            <tr>
+                <td>Financial Report</td>
+                <td>Fraud Risk</td>
+            </tr>
+            <tr>
+                <td>Architecture Docs</td>
+                <td>IP Theft</td>
+            </tr>
+            <tr>
+                <td>Customer Database</td>
+                <td>PII Breach (10K+)</td>
+            </tr>
+            <tr>
+                <td>API Keys</td>
+                <td>Lateral Movement</td>
+            </tr>
+            <tr>
+                <td>Certificates</td>
+                <td>Encryption Compromise</td>
+            </tr>
+        </table>
+        <div class="critical-box" style="margin-top: 10px;">
+            <strong>Regulatory Impact:</strong> GDPR (~€20M+), CCPA, mandatory breach notification
+        </div>
+    </div>
+
+    <!-- Timeline Section -->
+    <div class="section timeline">
+        <h3>⏱️ Attack Timeline (3-Second Window)</h3>
+        <div class="timeline-horizontal">
+            <div class="timeline-step">13:40:18<br>Access</div>
+            <div class="timeline-step">13:40:18.6<br>Financial</div>
+            <div class="timeline-step">13:40:18.9<br>Architecture</div>
+            <div class="timeline-step">13:40:19.2<br>Database</div>
+            <div class="timeline-step">13:40:19.5<br>API Keys</div>
+            <div class="timeline-step">13:40:20.1<br>Certs</div>
+            <div class="timeline-step">13:40:21<br>Complete</div>
+        </div>
+        <p><strong>Pattern Analysis:</strong> Consistent 300-600ms intervals between file transfers suggest scripted automated extraction tool. Evidence of advanced reconnaissance and pre-planning.</p>
+        <p><strong>Extraction Rate:</strong> ~500MB per file at near wire-speed transfer rates indicates high-bandwidth attacker connection or internal compromise.</p>
+    </div>
+
+    <!-- Recommendations Section -->
+    <div class="section recommendations">
+        <h3>✅ Response Roadmap</h3>
+        <div class="grid-3">
+            <div>
+                <strong style="color: #dc3545;">🚨 Immediate (0-24h)</strong>
+                <ul style="margin: 10px 0; font-size: 0.9em;">
+                    <li>Revoke credentials</li>
+                    <li>Block IP 108.97.44.37</li>
+                    <li>Reissue certificates</li>
+                    <li>Notify customers</li>
+                    <li>File incident report</li>
+                </ul>
+            </div>
+            <div>
+                <strong style="color: #ff9800;">⚠️ Short-term (1-7d)</strong>
+                <ul style="margin: 10px 0; font-size: 0.9em;">
+                    <li>Access audit</li>
+                    <li>Deploy monitoring</li>
+                    <li>Enable immutable logs</li>
+                    <li>Enforce MFA</li>
+                    <li>Network segmentation</li>
+                </ul>
+            </div>
+            <div>
+                <strong style="color: #28a745;">🛡️ Long-term (1-3m)</strong>
+                <ul style="margin: 10px 0; font-size: 0.9em;">
+                    <li>Data classification</li>
+                    <li>Encryption at rest</li>
+                    <li>Persistent monitoring</li>
+                    <li>Threat hunting</li>
+                    <li>Security training</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p><strong>Artifacts Available:</strong> Technical Report (HTML) | Presentation Slides (14) | Forensic Database | JSON Evidence Files (anomalies, timeline, report)</p>
+        <p>Classification: CONFIDENTIAL | Investigation Status: ACTIVE BREACH | Seminar Ready</p>
+    </div>
+</div>
+
+</body>
+</html>

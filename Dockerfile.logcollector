@@ -1,0 +1,17 @@
+# Dockerfile untuk Log Collector Service (offline-friendly)
+FROM df-flask-api:latest
+
+WORKDIR /app
+
+# Copy project files
+COPY scripts/log_collector.py /app/scripts/
+COPY config/config.py /app/config/
+COPY config/utils.py /app/config/
+COPY config/__init__.py /app/config/
+COPY scripts/__init__.py /app/scripts/
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/data
+
+# Run the log collector service
+CMD ["python", "scripts/log_collector.py"]

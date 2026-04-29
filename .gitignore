@@ -1,0 +1,78 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+.env
+.venv
+env/
+venv/
+
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+logs/nginx/
+logs/nextcloud/
+logs/postgres/
+logs/*.log
+*.log
+npm-debug.log*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Data files (generated)
+data/*.json
+data/*.csv
+!data/.gitkeep
+
+# MinIO data
+minio_data/
+minio_logs/
+
+# Generated reports
+forensic_report.html
+forensic_report.json
+attack_timeline.*
+parsed_logs.json
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# ML models (binary, regenerable)
+models/*.pkl
+models/training_results.json
+models/feature_names.json
+
+# ML datasets (regenerable)
+data/ml_datasets/
+
+# Keep cert sample dan folder structure
+!data/cert_sample.csv
+!data/.gitkeep
+!models/.gitkeep
+
+# Docker
+docker-compose.override.yml

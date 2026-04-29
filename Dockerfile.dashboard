@@ -1,0 +1,20 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy all project modules
+COPY config/       ./config/
+COPY analysis/     ./analysis/
+COPY scripts/      ./scripts/
+COPY dashboard/    ./dashboard/
+COPY main.py       .
+
+RUN mkdir -p /app/data /app/logs /app/models
+
+EXPOSE 5002
+
+CMD ["python", "dashboard/app.py"]

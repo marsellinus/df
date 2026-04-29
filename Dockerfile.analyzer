@@ -1,0 +1,17 @@
+# Dockerfile untuk Forensic Analyzer Service (offline-friendly)
+FROM df-flask-api:latest
+
+WORKDIR /app
+
+# Copy project files
+COPY analysis/forensic_analyzer.py /app/analysis/
+COPY config/config.py /app/config/
+COPY config/utils.py /app/config/
+COPY config/__init__.py /app/config/
+COPY analysis/__init__.py /app/analysis/
+
+RUN mkdir -p /app/logs /app/data
+
+EXPOSE 5001
+
+CMD ["python", "/app/analysis/forensic_analyzer.py"]

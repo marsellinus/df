@@ -1,0 +1,121 @@
+services:
+
+  # ── Nextcloud Stack (Target System) ──────────────────────────────────────────
+
+  nc-db:
+    image: postgres:16
+    container_name: nc-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forensic_db_pass}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextcloud -d nextcloud"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - nc_db_data:/var/lib/postgresql/data
+      - ./logs/postgres:/var/log/postgresql
+    networks:
+      - forensic-net
+
+  nc-redis:
+    image: redis:7-alpine
+    container_name: nc-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks:
+      - forensic-net
+
+  nc-app:
+    image: nextcloud:29-fpm
+    container_name: nc-app
+    restart: unless-stopped
+    depends_on:
+      nc-db:
+        condition: service_healthy
+      nc-redis:
+        condition: service_started
+    environment:
+      POSTGRES_HOST: nc-db
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forensic_db_pass}
+      REDIS_HOST: nc-redis
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER:-admin}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD:-admin_password_change_me}
+      NEXTCLOUD_TRUSTED_DOMAINS: localhost 127.0.0.1
+    volumes:
+      - nc_html:/var/www/html
+      - nc_data:/var/www/html/data
+      - nc_config:/var/www/html/config          # writable config dir
+      - ./logs/nextcloud:/var/log/nextcloud
+    networks:
+      - forensic-net
+
+  nc-web:
+    image: nginx:1.27-alpine
+    container_name: nc-web
+    restart: unless-stopped
+    depends_on:
+      - nc-app
+    ports:
+      - "8080:80"
+    volumes:
+      - nc_html:/var/www/html:ro
+      - nc_config:/var/www/html/config:ro       # read config for PHP files
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nextcloud.nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - forensic-net
+
+  nc-cron:
+    image: nextcloud:29-fpm
+    container_name: nc-cron
+    restart: unless-stopped
+    depends_on:
+      - nc-app
+    entrypoint: /cron.sh
+    volumes:
+      - nc_html:/var/www/html
+      - nc_data:/var/www/html/data
+      - nc_config:/var/www/html/config
+    networks:
+      - forensic-net
+
+  # ── Forensic Dashboard ────────────────────────────────────────────────────────
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: forensic-dashboard
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+      - ./logs/nginx:/app/logs/nginx:ro
+      - ./logs/nextcloud:/app/logs/nextcloud:ro
+    ports:
+      - "5002:5002"
+    networks:
+      - forensic-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  nc_db_data:
+  nc_html:
+  nc_data:
+  nc_config:
+
+networks:
+  forensic-net:
+    driver: bridge

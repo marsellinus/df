@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exfiltration Investigation System</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root{--bg:#0a0f1e;--surface:#111827;--card:#1a2235;--border:#1f2d45;--accent:#3b82f6;--red:#ef4444;--orange:#f97316;--yellow:#eab308;--green:#22c55e;--purple:#a855f7;--text:#e2e8f0;--muted:#64748b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;font-size:14px}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+#app{display:flex;flex-direction:column;height:100vh}
+#topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+#main{display:flex;flex:1;overflow:hidden}
+#sidebar{width:210px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+#content{flex:1;overflow-y:auto;padding:20px}
+.page{display:none}.page.active{display:block}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;border-left:3px solid transparent;color:var(--muted);transition:all .15s;font-size:.82rem}
+.nav-item:hover{background:var(--bg);color:var(--text)}.nav-item.active{border-left-color:var(--accent);background:var(--bg);color:var(--accent)}
+.nav-item i{width:16px;text-align:center;font-size:.85rem}
+.nav-sep{padding:12px 16px 4px;font-size:.65rem;color:#334155;text-transform:uppercase;letter-spacing:.08em;border-top:1px solid var(--border);margin-top:4px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px}
+.card-sm{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px}
+.tile{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.tile .v{font-size:1.9rem;font-weight:800;line-height:1.1}
+.tile .l{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.bc{background:#450a0a;color:#fca5a5}.bh{background:#431407;color:#fdba74}.bm{background:#422006;color:#fde68a}.bl{background:#052e16;color:#86efac}.bs{background:#0c1a3a;color:#93c5fd}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th{background:var(--bg);color:var(--muted);text-transform:uppercase;font-size:.65rem;letter-spacing:.06em;padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)}
+td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:#111827}
+input,select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 9px;font-size:.78rem;outline:none}
+input:focus,select:focus{border-color:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;border:none;transition:opacity .15s}
+.btn:hover{opacity:.85}.btn-p{background:var(--accent);color:#fff}.btn-r{background:var(--red);color:#fff}.btn-g{background:#1e293b;color:var(--text)}
+.risk-CRITICAL{color:#f87171}.risk-HIGH{color:#fb923c}.risk-MEDIUM{color:#fbbf24}.risk-LOW{color:#4ade80}.risk-SAFE{color:#60a5fa}
+.phase-EXFILTRATION{color:#f87171;font-weight:700}
+.phase-TARGET_ACCESS{color:#fb923c;font-weight:600}
+.phase-RECONNAISSANCE{color:#94a3b8}
+.phase-STEALTH_OPERATION{color:#a78bfa}
+.phase-LATERAL_MOVEMENT{color:#60a5fa}
+.phase-DATA_STAGING{color:#34d399}
+.phase-EVIDENCE_DESTRUCTION{color:#f43f5e;font-weight:700}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.pulse{animation:pulse 2s infinite}
+#login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+#login-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:36px;width:340px}
+#toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:.8rem;z-index:200;display:none}
+.evidence-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;border-left:3px solid var(--red)}
+.evidence-card.high{border-left-color:var(--orange)}.evidence-card.medium{border-left-color:var(--yellow)}.evidence-card.low{border-left-color:var(--green)}
+.suspect-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s}
+.suspect-card:hover{border-color:var(--accent)}
+.suspect-card.primary{border-color:#f87171;background:#1a0f0f}
+.timeline-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
+.timeline-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.dot-exfil{background:var(--red)}.dot-target{background:var(--orange)}.dot-recon{background:var(--muted)}.dot-stealth{background:var(--purple)}.dot-staging{background:var(--green)}
+.chart-box{position:relative;height:200px}
+.gauge-container{position:relative;width:160px;height:90px;margin:0 auto;overflow:hidden}
+.gauge-container canvas{position:absolute;top:0;left:0}
+.gauge-val{position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:1.8rem;font-weight:800}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-overlay">
+  <div id="login-box">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="width:48px;height:48px;background:linear-gradient(135deg,#ef4444,#7c3aed);border-radius:12px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px">
+        <i class="fas fa-user-secret" style="color:#fff;font-size:1.2rem"></i>
+      </div>
+      <div style="font-size:1.1rem;font-weight:700">Exfiltration Investigation</div>
+      <div style="color:var(--muted);font-size:.75rem;margin-top:3px">Unauthorized Data Exfiltration · Private Cloud Storage</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <input id="lu" type="text" placeholder="Username" style="width:100%" value="admin">
+      <input id="lp" type="password" placeholder="Password" style="width:100%" value="forensic2024">
+      <button class="btn btn-p" style="width:100%;justify-content:center;padding:9px" onclick="doLogin()">
+        <i class="fas fa-sign-in-alt"></i> Sign In
+      </button>
+      <p id="lerr" style="color:var(--red);font-size:.75rem;text-align:center;display:none"></p>
+    </div>
+    <p style="color:var(--muted);font-size:.68rem;text-align:center;margin-top:14px">admin / forensic2024</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <div id="topbar">
+    <div style="width:28px;height:28px;background:linear-gradient(135deg,#ef4444,#7c3aed);border-radius:7px;display:flex;align-items:center;justify-content:center">
+      <i class="fas fa-user-secret" style="color:#fff;font-size:.8rem"></i>
+    </div>
+    <span style="font-weight:700;font-size:.9rem">Exfiltration Investigation System</span>
+    <span style="color:var(--muted);font-size:.72rem;flex:1">Unauthorized Data Exfiltration · Private Cloud Storage</span>
+    <span id="tb-score" style="font-size:.78rem;font-weight:700"></span>
+    <span style="width:7px;height:7px;background:var(--green);border-radius:50%" class="pulse"></span>
+    <span style="font-size:.72rem;color:var(--muted)">Live</span>
+    <button class="btn btn-g" style="padding:4px 10px;font-size:.72rem" onclick="doLogout()">
+      <i class="fas fa-sign-out-alt"></i> <span id="tb-user"></span>
+    </button>
+  </div>
+
+  <div id="main">
+    <div id="sidebar">
+      <div class="nav-sep" style="border-top:none;margin-top:8px">Investigation</div>
+      <div class="nav-item active" onclick="nav('overview')"><i class="fas fa-crosshairs"></i>Case Overview</div>
+      <div class="nav-item" onclick="nav('suspects')"><i class="fas fa-user-secret"></i>Suspect Profiles</div>
+      <div class="nav-item" onclick="nav('reconstruction')"><i class="fas fa-puzzle-piece"></i>Reconstruction</div>
+      <div class="nav-item" onclick="nav('timeline')"><i class="fas fa-stream"></i>Attack Timeline</div>
+      <div class="nav-item" onclick="nav('evidence')"><i class="fas fa-shield-halved"></i>Evidence <span id="ev-badge" style="margin-left:auto;background:var(--red);color:#fff;border-radius:999px;padding:1px 6px;font-size:.62rem;display:none"></span></div>
+      <div class="nav-sep">Data</div>
+      <div class="nav-item" onclick="nav('logs')"><i class="fas fa-list-ul"></i>Raw Logs</div>
+      <div class="nav-item" onclick="nav('dataset')"><i class="fas fa-database"></i>Dataset</div>
+      <div class="nav-item" onclick="nav('ml')"><i class="fas fa-brain"></i>ML Analysis</div>
+      <div class="nav-sep">Tools</div>
+      <div class="nav-item" onclick="nav('simulate')"><i class="fas fa-bolt"></i>Attack Simulator</div>
+    </div>
+
+    <div id="content">
+
+<!-- ═══ PAGE: CASE OVERVIEW ═══ -->
+<div id="page-overview" class="page active">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+    <div>
+      <h2 style="font-size:1rem;font-weight:700">Case Overview</h2>
+      <p style="color:var(--muted);font-size:.75rem">Unauthorized data exfiltration — private cloud storage</p>
+    </div>
+    <button class="btn btn-g" onclick="loadOverview()"><i class="fas fa-sync-alt"></i> Refresh</button>
+  </div>
+
+  <!-- Risk gauge + key metrics -->
+  <div style="display:grid;grid-template-columns:200px 1fr;gap:14px;margin-bottom:14px">
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+      <div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Exfiltration Risk</div>
+      <div class="gauge-container">
+        <canvas id="gauge-canvas" width="160" height="90"></canvas>
+        <div class="gauge-val" id="gauge-val">–</div>
+      </div>
+      <div id="gauge-band" style="font-size:.85rem;font-weight:700">–</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+      <div class="tile"><div class="v" id="ov-suspects" style="color:#f87171">–</div><div class="l">Suspects</div></div>
+      <div class="tile"><div class="v" id="ov-files" style="color:#fb923c">–</div><div class="l">Files Stolen</div></div>
+      <div class="tile"><div class="v" id="ov-mb" style="color:#fbbf24">–</div><div class="l">MB Exfiltrated</div></div>
+      <div class="tile"><div class="v" id="ov-events" style="color:#60a5fa">–</div><div class="l">Total Events</div></div>
+    </div>
+  </div>
+
+  <!-- Suspect summary table -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:.8rem;font-weight:600;margin-bottom:12px"><i class="fas fa-user-secret" style="color:var(--red)"></i> Suspect Risk Ranking</div>
+    <table>
+      <thead><tr><th>Suspect</th><th>Risk Score</th><th>Band</th><th>Files Downloaded</th><th>Data Exfiltrated</th><th>Sensitive Files</th><th>IPs Used</th><th>Off-Hours</th></tr></thead>
+      <tbody id="ov-suspect-table"><tr><td colspan="8" style="color:var(--muted);text-align:center">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Charts -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div class="card">
+      <div style="font-size:.78rem;font-weight:600;margin-bottom:10px">Attack Phase Distribution</div>
+      <div class="chart-box"><canvas id="chart-phases"></canvas></div>
+    </div>
+    <div class="card">
+      <div style="font-size:.78rem;font-weight:600;margin-bottom:10px">Exfiltration Volume by Suspect (MB)</div>
+      <div class="chart-box"><canvas id="chart-volume"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: SUSPECT PROFILES ═══ -->
+<div id="page-suspects" class="page">
+  <div style="margin-bottom:18px">
+    <h2 style="font-size:1rem;font-weight:700">Suspect Profiles</h2>
+    <p style="color:var(--muted);font-size:.75rem">Detailed behavioral analysis per actor</p>
+  </div>
+  <div id="suspect-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">
+    <div style="color:var(--muted);font-size:.8rem">Loading…</div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: RECONSTRUCTION ═══ -->
+<div id="page-reconstruction" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+    <div>
+      <h2 style="font-size:1rem;font-weight:700">Attack Reconstruction</h2>
+      <p style="color:var(--muted);font-size:.75rem">Structured forensic output — who / when / what / how / how much</p>
+    </div>
+    <button class="btn btn-p" onclick="loadReconstruction()"><i class="fas fa-play"></i> Run Reconstruction</button>
+  </div>
+
+  <div id="recon-output" style="display:flex;flex-direction:column;gap:14px">
+    <div style="color:var(--muted);font-size:.8rem;text-align:center;padding:40px">Click "Run Reconstruction" to generate forensic report.</div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: ATTACK TIMELINE ═══ -->
+<div id="page-timeline" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+    <div>
+      <h2 style="font-size:1rem;font-weight:700">Attack Timeline</h2>
+      <p style="color:var(--muted);font-size:.75rem">Chronological reconstruction of the exfiltration attack</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="tl-filter-user" style="width:130px" onchange="loadTimeline()">
+        <option value="">All suspects</option>
+      </select>
+      <button class="btn btn-g" onclick="loadTimeline()"><i class="fas fa-sync-alt"></i></button>
+    </div>
+  </div>
+
+  <!-- Phase legend -->
+  <div class="card" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:14px;padding:10px 16px">
+    <span class="phase-RECONNAISSANCE" style="font-size:.72rem"><i class="fas fa-circle" style="font-size:.45rem"></i> Reconnaissance</span>
+    <span class="phase-TARGET_ACCESS" style="font-size:.72rem"><i class="fas fa-circle" style="font-size:.45rem"></i> Target Access</span>
+    <span class="phase-DATA_STAGING" style="font-size:.72rem"><i class="fas fa-circle" style="font-size:.45rem"></i> Data Staging</span>
+    <span class="phase-EXFILTRATION" style="font-size:.72rem"><i class="fas fa-circle" style="font-size:.45rem"></i> Exfiltration</span>
+    <span class="phase-STEALTH_OPERATION" style="font-size:.72rem"><i class="fas fa-circle" style="font-size:.45rem"></i> Stealth</span>
+    <span class="phase-EVIDENCE_DESTRUCTION" style="font-size:.72rem"><i class="fas fa-circle" style="font-size:.45rem"></i> Evidence Destruction</span>
+  </div>
+
+  <!-- Stats -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+    <div class="tile"><div class="v" id="tl-total">–</div><div class="l">Total Events</div></div>
+    <div class="tile"><div class="v" id="tl-exfil" style="color:var(--red)">–</div><div class="l">Exfiltration Events</div></div>
+    <div class="tile"><div class="v" id="tl-first" style="font-size:.9rem">–</div><div class="l">Attack Start</div></div>
+    <div class="tile"><div class="v" id="tl-last" style="font-size:.9rem">–</div><div class="l">Attack End</div></div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>#</th><th>Timestamp (UTC)</th><th>Phase</th><th>Suspect</th><th>IP</th><th>Action</th><th>Target File</th><th>Size</th></tr></thead>
+        <tbody id="tl-body"><tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: EVIDENCE ═══ -->
+<div id="page-evidence" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+    <div>
+      <h2 style="font-size:1rem;font-weight:700">Evidence</h2>
+      <p style="color:var(--muted);font-size:.75rem">Detected anomalies and forensic indicators of compromise</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <select id="ev-sev" style="width:120px">
+        <option value="LOW">All severity</option>
+        <option value="MEDIUM">MEDIUM+</option>
+        <option value="HIGH" selected>HIGH+</option>
+        <option value="CRITICAL">CRITICAL only</option>
+      </select>
+      <button class="btn btn-g" onclick="loadEvidence()"><i class="fas fa-search"></i> Filter</button>
+    </div>
+  </div>
+  <div style="font-size:.78rem;color:var(--muted);margin-bottom:10px">
+    <strong id="ev-count" style="color:var(--text)">–</strong> evidence items
+  </div>
+  <div id="ev-cards" style="display:flex;flex-direction:column;gap:10px">
+    <div style="color:var(--muted);text-align:center;padding:20px">Loading…</div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: RAW LOGS ═══ -->
+<div id="page-logs" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+    <div>
+      <h2 style="font-size:1rem;font-weight:700">Raw Logs</h2>
+      <p style="color:var(--muted);font-size:.75rem">All ingested log records — filterable by user, IP, operation, source</p>
+    </div>
+    <button class="btn btn-g" onclick="loadLogs()"><i class="fas fa-sync-alt"></i> Refresh</button>
+  </div>
+  <div class="card" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+    <input id="log-user" placeholder="User…" style="width:110px">
+    <input id="log-ip" placeholder="IP…" style="width:120px">
+    <select id="log-op" style="width:120px">
+      <option value="">All operations</option>
+      <option>GET</option><option>PUT</option><option>DELETE</option>
+      <option>PROPFIND</option><option>COPY</option><option>EXFIL_USB</option>
+      <option>LOGIN_SUCCESS</option><option>LOGIN_FAILED</option><option>USB_CONNECT</option>
+    </select>
+    <select id="log-src" style="width:140px">
+      <option value="">All sources</option>
+      <option value="nextcloud">Nextcloud</option>
+      <option value="cert_dataset">CERT File</option>
+      <option value="cert_logon">CERT Logon</option>
+      <option value="cert_device">CERT Device</option>
+    </select>
+    <button class="btn btn-p" onclick="loadLogs(1)"><i class="fas fa-search"></i> Filter</button>
+    <span style="margin-left:auto;font-size:.75rem;color:var(--muted)">
+      <strong id="log-total" style="color:var(--text)">–</strong> records
+      · page <strong id="log-page-info" style="color:var(--text)">–</strong>
+    </span>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:10px">
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>#</th><th>Timestamp</th><th>User</th><th>IP / Host</th><th>Operation</th><th>File / Object</th><th>Size</th><th>Source</th></tr></thead>
+        <tbody id="log-body"><tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:center">
+    <button class="btn btn-g" id="log-prev" onclick="logPage(-1)"><i class="fas fa-chevron-left"></i> Prev</button>
+    <button class="btn btn-g" id="log-next" onclick="logPage(1)">Next <i class="fas fa-chevron-right"></i></button>
+  </div>
+</div>
+
+<!-- ═══ PAGE: DATASET ═══ -->
+<div id="page-dataset" class="page">
+  <div style="margin-bottom:18px">
+    <h2 style="font-size:1rem;font-weight:700">Dataset</h2>
+    <p style="color:var(--muted);font-size:.75rem">Cross-source breakdown — CERT Insider Threat vs Nextcloud</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:18px" id="ds-source-cards">
+    <div style="color:var(--muted)">Loading…</div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:12px"><i class="fas fa-file-csv" style="color:var(--green)"></i> CERT Insider Threat Sample</div>
+    <div id="ds-cert-info" style="color:var(--muted);font-size:.78rem">Loading…</div>
+    <div style="margin-top:12px;overflow-x:auto" id="ds-cert-table"></div>
+  </div>
+  <div class="card">
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:8px"><i class="fas fa-info-circle" style="color:var(--accent)"></i> Dataset Info</div>
+    <div style="font-size:.78rem;color:var(--muted);line-height:1.7">
+      <strong style="color:var(--text)">CERT Insider Threat Dataset r4.2</strong> — Carnegie Mellon University<br>
+      Simulasi aktivitas insider threat: eksfiltrasi file via USB, akses file sensitif di luar jam kerja, pola anomali.<br>
+      Sumber: <a href="https://kilthub.cmu.edu/articles/dataset/CERT_Insider_Threat_Dataset/12841247" target="_blank" style="color:var(--accent)">kilthub.cmu.edu</a><br><br>
+      <strong style="color:var(--text)">Nextcloud Logs</strong> — Generated dari stack Docker lokal<br>
+      Log nginx JSON + Nextcloud admin_audit dari simulasi serangan nyata terhadap Nextcloud 29.
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: ML ANALYSIS ═══ -->
+<div id="page-ml" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+    <div>
+      <h2 style="font-size:1rem;font-weight:700">ML Analysis</h2>
+      <p style="color:var(--muted);font-size:.75rem">Ensemble anomaly detection — Random Forest · Gradient Boosting · Logistic Regression</p>
+    </div>
+    <button class="btn btn-g" onclick="loadML()"><i class="fas fa-sync-alt"></i> Refresh</button>
+  </div>
+  <!-- Model cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:18px" id="ml-model-cards">
+    <div style="color:var(--muted)">Loading…</div>
+  </div>
+  <!-- Training info -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:10px"><i class="fas fa-info-circle" style="color:var(--accent)"></i> Training Info</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:.78rem" id="ml-train-info">
+      <div><div style="color:var(--muted)">Trained At</div><strong id="ml-ts">–</strong></div>
+      <div><div style="color:var(--muted)">Train Samples</div><strong id="ml-train-n">–</strong></div>
+      <div><div style="color:var(--muted)">Test Samples</div><strong id="ml-test-n">–</strong></div>
+      <div><div style="color:var(--muted)">Features</div><strong id="ml-feats">–</strong></div>
+    </div>
+  </div>
+  <!-- Feature list -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:10px"><i class="fas fa-list" style="color:var(--purple)"></i> Feature Names</div>
+    <div id="ml-feature-list" style="display:flex;flex-wrap:wrap;gap:6px;font-size:.72rem"></div>
+  </div>
+  <!-- Live prediction tester -->
+  <div class="card">
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:12px"><i class="fas fa-flask" style="color:var(--orange)"></i> Live Prediction Tester</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+      <div>
+        <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">User</label>
+        <input id="ml-user" value="attacker1" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">Source IP</label>
+        <input id="ml-ip" value="108.97.44.37" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">File / Object</label>
+        <input id="ml-obj" value="api_keys.txt" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">Bytes Transferred (MB)</label>
+        <input id="ml-bytes" type="number" value="250" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">Operation</label>
+        <select id="ml-action" style="width:100%">
+          <option value="GetObject">GetObject (Download)</option>
+          <option value="PutObject">PutObject (Upload)</option>
+          <option value="ListBucket">ListBucket (Enumerate)</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn btn-p" style="width:100%;justify-content:center" onclick="runMLPredict()">
+          <i class="fas fa-play"></i> Predict
+        </button>
+      </div>
+    </div>
+    <div id="ml-pred-result" style="display:none;padding:12px;background:var(--bg);border-radius:8px;font-size:.8rem"></div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: ATTACK SIMULATOR ═══ -->
+<div id="page-simulate" class="page">
+  <div style="margin-bottom:18px">
+    <h2 style="font-size:1rem;font-weight:700">Attack Simulator</h2>
+    <p style="color:var(--muted);font-size:.75rem">Generate real attack traffic against Nextcloud to produce forensic evidence</p>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div class="card">
+      <div style="font-size:.82rem;font-weight:600;margin-bottom:14px"><i class="fas fa-bolt" style="color:var(--orange)"></i> Launch Scenario</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>
+          <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">Scenario</label>
+          <select id="sim-scenario" style="width:100%">
+            <option value="full">Full Attack Sequence</option>
+            <option value="bulk_download">Bulk Download (Exfiltration)</option>
+            <option value="multi_ip">Multi-IP Access (VPN hopping)</option>
+            <option value="off_hours">Off-Hours Intrusion</option>
+            <option value="sensitive">Sensitive File Targeting</option>
+            <option value="normal">Normal Operations (baseline)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">Attacker Username</label>
+          <input id="sim-attacker" type="text" value="attacker1" style="width:100%">
+        </div>
+        <div>
+          <label style="font-size:.7rem;color:var(--muted);display:block;margin-bottom:3px">Files to Target</label>
+          <input id="sim-files" type="number" value="5" min="1" max="20" style="width:100%">
+        </div>
+        <button class="btn btn-r" style="justify-content:center" onclick="runSim()">
+          <i class="fas fa-play"></i> Launch Attack
+        </button>
+        <div id="sim-result" style="font-size:.78rem;color:var(--muted);display:none;padding:8px;background:var(--bg);border-radius:6px"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="card-sm"><div style="font-size:.75rem;font-weight:600;color:var(--red);margin-bottom:4px"><i class="fas fa-download"></i> Bulk Download</div><div style="font-size:.73rem;color:var(--muted)">Rapid GET requests for all sensitive files. Triggers BULK_DOWNLOAD + RAPID_SUCCESSION anomalies.</div></div>
+      <div class="card-sm"><div style="font-size:.75rem;font-weight:600;color:var(--orange);margin-bottom:4px"><i class="fas fa-network-wired"></i> Multi-IP Access</div><div style="font-size:.73rem;color:var(--muted)">Same actor from multiple IPs (VPN/proxy hopping). Triggers MULTIPLE_IP_ADDRESSES.</div></div>
+      <div class="card-sm"><div style="font-size:.75rem;font-weight:600;color:var(--purple);margin-bottom:4px"><i class="fas fa-moon"></i> Off-Hours Intrusion</div><div style="font-size:.73rem;color:var(--muted)">Access at 02:00 UTC. Triggers OFF_HOURS_ACCESS anomaly.</div></div>
+      <div class="card-sm"><div style="font-size:.75rem;font-weight:600;color:var(--yellow);margin-bottom:4px"><i class="fas fa-file-shield"></i> Sensitive File Targeting</div><div style="font-size:.73rem;color:var(--muted)">Repeated access to credentials, financial data, API keys. Triggers SENSITIVE_FILE_ACCESS.</div></div>
+    </div>
+  </div>
+</div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+<div id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let charts = {};
+let currentPage = 'overview';
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const u = document.getElementById('lu').value;
+  const p = document.getElementById('lp').value;
+  try {
+    const r = await fetch('/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
+    const d = await r.json();
+    if (r.ok) {
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      document.getElementById('tb-user').textContent = d.user;
+      init();
+    } else {
+      const el = document.getElementById('lerr');
+      el.textContent = d.error || 'Login failed';
+      el.style.display = 'block';
+    }
+  } catch {
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('tb-user').textContent = u;
+    init();
+  }
+}
+document.getElementById('lp').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+function doLogout() { fetch('/logout'); document.getElementById('app').style.display='none'; document.getElementById('login-overlay').style.display='flex'; }
+
+// ── Nav ───────────────────────────────────────────────────────────────────────
+function nav(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => { if (n.getAttribute('onclick') === `nav('${page}')`) n.classList.add('active'); });
+  currentPage = page;
+  if (page === 'overview')       loadOverview();
+  if (page === 'suspects')       loadSuspects();
+  if (page === 'reconstruction') loadReconstruction();
+  if (page === 'timeline')       loadTimeline();
+  if (page === 'evidence')       loadEvidence();
+  if (page === 'logs')           loadLogs();
+  if (page === 'dataset')        loadDataset();
+  if (page === 'ml')             loadML();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function toast(msg, color='var(--green)') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderColor = color; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+const PAL = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7','#06b6d4','#f43f5e'];
+function mkChart(id, type, labels, datasets, opts={}) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, { type, data: {labels, datasets}, options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#64748b',font:{size:10}}}},
+    scales: (type==='bar'||type==='line') ? {x:{ticks:{color:'#475569',font:{size:10}},grid:{color:'#1f2d45'}},y:{ticks:{color:'#475569',font:{size:10}},grid:{color:'#1f2d45'}}} : {},
+    ...opts
+  }});
+}
+
+// ── Gauge ─────────────────────────────────────────────────────────────────────
+function drawGauge(score, band) {
+  const canvas = document.getElementById('gauge-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 80, cy = 80, r = 65;
+  ctx.clearRect(0, 0, 160, 90);
+  // background arc
+  ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, 0); ctx.lineWidth = 14;
+  ctx.strokeStyle = '#1f2d45'; ctx.stroke();
+  // value arc
+  const colors = {SAFE:'#3b82f6',LOW:'#22c55e',MEDIUM:'#eab308',HIGH:'#f97316',CRITICAL:'#ef4444'};
+  const angle = Math.PI + (score / 100) * Math.PI;
+  ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, angle); ctx.lineWidth = 14;
+  ctx.strokeStyle = colors[band] || '#ef4444'; ctx.stroke();
+  document.getElementById('gauge-val').textContent = score;
+  document.getElementById('gauge-val').className = 'gauge-val risk-' + band;
+  document.getElementById('gauge-band').textContent = band;
+  document.getElementById('gauge-band').className = 'risk-' + band;
+  document.getElementById('tb-score').textContent = `Risk: ${score} (${band})`;
+  document.getElementById('tb-score').className = 'risk-' + band;
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const risk = await fetch('/api/risk-score').then(r => r.json());
+    drawGauge(risk.session_risk_score, risk.session_risk_band);
+
+    const scores = risk.user_scores || {};
+    const suspects = Object.values(scores).filter(u => u.risk_band !== 'SAFE');
+    document.getElementById('ov-suspects').textContent = suspects.length;
+
+    let totalFiles = 0, totalMb = 0;
+    Object.values(scores).forEach(u => {
+      totalFiles += u.profile_summary?.get_count || 0;
+      totalMb += u.profile_summary?.bytes_total_mb || 0;
+    });
+    document.getElementById('ov-files').textContent = totalFiles;
+    document.getElementById('ov-mb').textContent = totalMb.toFixed(1);
+    document.getElementById('ov-events').textContent = risk.total_logs || 0;
+
+    // Alert badge
+    const critCount = (risk.anomalies||[]).filter(a => ['CRITICAL','HIGH'].includes(a.severity)).length;
+    const badge = document.getElementById('ev-badge');
+    if (critCount > 0) { badge.textContent = critCount; badge.style.display = 'inline'; }
+
+    // Suspect table
+    const tbody = document.getElementById('ov-suspect-table');
+    const sorted = Object.values(scores).sort((a,b) => b.risk_score - a.risk_score);
+    tbody.innerHTML = sorted.map(u => {
+      const p = u.profile_summary || {};
+      const sf = (p.sensitive_files||[]).length;
+      return `<tr>
+        <td style="font-weight:600">${u.user_id}</td>
+        <td><span class="risk-${u.risk_band}" style="font-size:1.1rem;font-weight:800">${u.risk_score}</span></td>
+        <td><span class="badge b${u.risk_band[0].toLowerCase()}">${u.risk_band}</span></td>
+        <td>${p.get_count||0}</td>
+        <td>${(p.bytes_total_mb||0).toFixed(2)} MB</td>
+        <td style="color:${sf>0?'var(--orange)':'var(--muted)'}">${sf > 0 ? sf + ' file(s)' : '–'}</td>
+        <td>${p.unique_ip_count||0}</td>
+        <td style="color:${(p.off_hours_events||0)>0?'var(--purple)':'var(--muted)'}">${p.off_hours_events||0}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="8" style="color:var(--muted);text-align:center">No data</td></tr>';
+
+    // Phase chart
+    const phases = risk.timeline_summary?.phases || {};
+    mkChart('chart-phases','doughnut', Object.keys(phases), [{data:Object.values(phases), backgroundColor:PAL, borderColor:'#0a0f1e', borderWidth:2}]);
+
+    // Volume chart
+    const vUsers = sorted.filter(u => (u.profile_summary?.bytes_total_mb||0) > 0);
+    mkChart('chart-volume','bar', vUsers.map(u=>u.user_id), [{
+      label:'MB', data: vUsers.map(u=>u.profile_summary?.bytes_total_mb||0),
+      backgroundColor: vUsers.map(u => u.risk_band==='CRITICAL'?'#ef4444':u.risk_band==='HIGH'?'#f97316':'#3b82f6'),
+      borderRadius:4
+    }]);
+  } catch(e) { toast('Overview error: '+e.message, 'var(--red)'); }
+}
+</script>
+
+<script>
+// ── Suspect Profiles ──────────────────────────────────────────────────────────
+async function loadSuspects() {
+  try {
+    const risk = await fetch('/api/risk-score').then(r => r.json());
+    const scores = Object.values(risk.user_scores||{}).sort((a,b) => b.risk_score - a.risk_score);
+    const anomalies = risk.anomalies || [];
+    const container = document.getElementById('suspect-cards');
+
+    container.innerHTML = scores.map(u => {
+      const p = u.profile_summary || {};
+      const ua = anomalies.filter(a => a.user_id === u.user_id);
+      const isPrimary = u.risk_band === 'CRITICAL' || u.risk_band === 'HIGH';
+      const sf = p.sensitive_files || [];
+
+      const signals = Object.entries(u.signals||{}).map(([k,v]) => `
+        <div style="margin-bottom:5px">
+          <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin-bottom:2px">
+            <span>${k.replace(/_/g,' ')}</span><span>${v}%</span>
+          </div>
+          <div style="background:var(--bg);border-radius:3px;height:3px">
+            <div style="background:${v>70?'var(--red)':v>40?'var(--orange)':'var(--accent)'};width:${v}%;height:3px;border-radius:3px"></div>
+          </div>
+        </div>`).join('');
+
+      const aList = ua.map(a => `
+        <div style="display:flex;align-items:center;gap:6px;font-size:.72rem;margin-bottom:3px">
+          <span class="badge b${a.severity[0].toLowerCase()}">${a.severity}</span>
+          <span style="color:var(--text)">${a.anomaly_type.replace(/_/g,' ')}</span>
+        </div>`).join('');
+
+      return `<div class="suspect-card ${isPrimary?'primary':''}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <div style="font-weight:700;font-size:.9rem">${u.user_id}</div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${p.total_events||0} events · ${p.unique_ip_count||0} IP(s)</div>
+          </div>
+          <div style="text-align:right">
+            <div class="risk-${u.risk_band}" style="font-size:1.6rem;font-weight:800;line-height:1">${u.risk_score}</div>
+            <span class="badge b${u.risk_band[0].toLowerCase()}">${u.risk_band}</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;font-size:.75rem">
+          <div><span style="color:var(--muted)">Downloads:</span> <strong>${p.get_count||0} files</strong></div>
+          <div><span style="color:var(--muted)">Volume:</span> <strong>${(p.bytes_total_mb||0).toFixed(2)} MB</strong></div>
+          <div><span style="color:var(--muted)">Off-hours:</span> <strong style="color:${(p.off_hours_events||0)>0?'var(--purple)':'inherit'}">${p.off_hours_events||0} events</strong></div>
+          <div><span style="color:var(--muted)">Sensitive:</span> <strong style="color:${sf.length>0?'var(--orange)':'inherit'}">${sf.length} file(s)</strong></div>
+        </div>
+        ${sf.length > 0 ? `<div style="font-size:.7rem;color:var(--orange);margin-bottom:10px;padding:6px;background:var(--bg);border-radius:5px"><i class="fas fa-file-shield"></i> ${sf.join(', ')}</div>` : ''}
+        ${signals ? `<div style="margin-bottom:10px">${signals}</div>` : ''}
+        ${aList ? `<div style="border-top:1px solid var(--border);padding-top:8px">${aList}</div>` : ''}
+      </div>`;
+    }).join('') || '<div style="color:var(--muted)">No suspects found.</div>';
+  } catch(e) { toast('Suspects error: '+e.message, 'var(--red)'); }
+}
+
+// ── Reconstruction ────────────────────────────────────────────────────────────
+async function loadReconstruction() {
+  const out = document.getElementById('recon-output');
+  out.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px"><i class="fas fa-spinner fa-spin"></i> Running reconstruction…</div>';
+  try {
+    const r = await fetch('/api/reconstruction').then(r => r.json());
+    if (r.error) { out.innerHTML = `<div style="color:var(--red)">${r.error}</div>`; return; }
+
+    const band = r.session_risk_band;
+    const bandColor = {CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--yellow)',LOW:'var(--green)',SAFE:'var(--accent)'}[band]||'var(--muted)';
+
+    // WHO
+    const whoRows = Object.entries(r.who||{}).sort((a,b)=>b[1].risk_score-a[1].risk_score).map(([uid,u]) =>
+      `<tr><td style="font-weight:600">${uid}</td><td class="risk-${u.risk_band}" style="font-weight:800">${u.risk_score}</td>
+       <td><span class="badge b${u.risk_band[0].toLowerCase()}">${u.risk_band}</span></td>
+       <td>${u.total_events}</td><td>${u.ips_used}</td>
+       <td style="color:var(--orange);font-size:.72rem">${(u.sensitive_files_accessed||[]).join(', ')||'–'}</td></tr>`
+    ).join('');
+
+    // WHAT
+    const whatRows = (r.what||[]).map(a =>
+      `<tr><td><span class="badge b${a.severity[0].toLowerCase()}">${a.severity}</span></td>
+       <td style="font-weight:600">${a.type.replace(/_/g,' ')}</td>
+       <td style="color:#93c5fd">${a.user}</td>
+       <td style="font-size:.72rem">${a.description}</td></tr>`
+    ).join('');
+
+    // HOW MUCH
+    const howRows = Object.entries(r.how_much||{}).filter(([,d])=>d.files_downloaded>0)
+      .sort((a,b)=>b[1].bytes_total_mb-a[1].bytes_total_mb).map(([uid,d]) =>
+        `<tr><td style="font-weight:600">${uid}</td><td>${d.files_downloaded}</td>
+         <td style="font-weight:700;color:var(--orange)">${d.bytes_total_mb.toFixed(2)} MB</td></tr>`
+      ).join('');
+
+    const w = r.when || {};
+    out.innerHTML = `
+      <!-- Session Risk -->
+      <div class="card" style="border-color:${bandColor};display:flex;align-items:center;gap:20px">
+        <div style="text-align:center;min-width:100px">
+          <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Session Risk</div>
+          <div style="font-size:3rem;font-weight:800;color:${bandColor};line-height:1">${r.session_risk_score}</div>
+          <div style="font-size:.8rem;font-weight:700;color:${bandColor}">${band}</div>
+        </div>
+        <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;font-size:.78rem">
+          <div><div style="color:var(--muted);margin-bottom:2px">First Event</div><strong>${(w.first_event||'–').replace('T',' ').slice(0,19)}</strong></div>
+          <div><div style="color:var(--muted);margin-bottom:2px">Last Event</div><strong>${(w.last_event||'–').replace('T',' ').slice(0,19)}</strong></div>
+          <div><div style="color:var(--muted);margin-bottom:2px">Attack Phases</div><strong>${Object.entries(w.attack_phases||{}).map(([k,v])=>`${k.replace(/_/g,' ')}×${v}`).join(', ')}</strong></div>
+        </div>
+      </div>
+
+      <!-- WHO -->
+      <div class="card">
+        <div style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--red)"><i class="fas fa-user-secret"></i> WHO — Actors</div>
+        <table><thead><tr><th>Actor</th><th>Risk Score</th><th>Band</th><th>Events</th><th>IPs</th><th>Sensitive Files Accessed</th></tr></thead>
+        <tbody>${whoRows}</tbody></table>
+      </div>
+
+      <!-- WHAT -->
+      <div class="card">
+        <div style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--orange)"><i class="fas fa-triangle-exclamation"></i> WHAT — Actions Detected</div>
+        <table><thead><tr><th>Severity</th><th>Type</th><th>Actor</th><th>Description</th></tr></thead>
+        <tbody>${whatRows}</tbody></table>
+      </div>
+
+      <!-- HOW MUCH -->
+      <div class="card">
+        <div style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--yellow)"><i class="fas fa-database"></i> HOW MUCH — Data Exfiltrated</div>
+        <table><thead><tr><th>Actor</th><th>Files Downloaded</th><th>Total Volume</th></tr></thead>
+        <tbody>${howRows||'<tr><td colspan="3" style="color:var(--muted)">No exfiltration detected</td></tr>'}</tbody></table>
+      </div>`;
+  } catch(e) { out.innerHTML = `<div style="color:var(--red)">Error: ${e.message}</div>`; }
+}
+
+// ── Timeline ──────────────────────────────────────────────────────────────────
+async function loadTimeline() {
+  const tbody = document.getElementById('tl-body');
+  tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Loading…</td></tr>';
+  try {
+    const [risk, logsData] = await Promise.all([
+      fetch('/api/risk-score').then(r=>r.json()),
+      fetch('/api/logs/raw?per_page=500').then(r=>r.json())
+    ]);
+
+    // Populate user filter
+    const sel = document.getElementById('tl-filter-user');
+    const users = Object.keys(risk.user_scores||{});
+    sel.innerHTML = '<option value="">All suspects</option>' + users.map(u=>`<option value="${u}">${u}</option>`).join('');
+
+    const filterUser = sel.value;
+    const userAtypes = {};
+    (risk.anomalies||[]).forEach(a => {
+      userAtypes[a.user_id] = userAtypes[a.user_id] || new Set();
+      userAtypes[a.user_id].add(a.anomaly_type);
+    });
+
+    const SENSITIVE = ['financial_report_2024.xlsx','customer_database.csv','api_keys.txt','technical_architecture.pdf','private_certificates.pem','hr_records_2024.xlsx','source_code_backup.zip'];
+    function phase(log, at) {
+      const op = log.operation||'', f = log.object_name||'';
+      if (at.has('BULK_DOWNLOAD') && op==='GET') return 'EXFILTRATION';
+      if (SENSITIVE.includes(f)) return 'TARGET_ACCESS';
+      if (at.has('OFF_HOURS_ACCESS')) return 'STEALTH_OPERATION';
+      if (at.has('MULTIPLE_IP_ADDRESSES')) return 'LATERAL_MOVEMENT';
+      if (op==='PUT') return 'DATA_STAGING';
+      if (op==='DELETE') return 'EVIDENCE_DESTRUCTION';
+      return 'RECONNAISSANCE';
+    }
+
+    let logs = (logsData.logs||[]).sort((a,b)=>(a.timestamp||'')<(b.timestamp||'')?-1:1);
+    if (filterUser) logs = logs.filter(l=>l.user_id===filterUser);
+
+    let exfilCount = 0;
+    tbody.innerHTML = logs.map((l,i) => {
+      const at = userAtypes[l.user_id] || new Set();
+      const ph = phase(l, at);
+      const isSusp = at.size > 0;
+      if (ph==='EXFILTRATION') exfilCount++;
+      const ts = (l.timestamp||'').replace('T',' ').slice(0,19);
+      const sz = l.file_size ? (l.file_size/1024).toFixed(1)+'KB' : '–';
+      return `<tr style="${isSusp?'background:rgba(239,68,68,.04)':''}">
+        <td style="color:var(--muted)">${i+1}</td>
+        <td style="white-space:nowrap;font-size:.72rem">${ts}</td>
+        <td class="phase-${ph}" style="font-size:.72rem">${ph.replace(/_/g,' ')}</td>
+        <td style="font-weight:600;color:#93c5fd">${l.user_id||'–'}</td>
+        <td style="font-size:.72rem">${l.source_ip||'–'}</td>
+        <td><span class="badge ${l.operation==='GET'?'bs':l.operation==='DELETE'?'bc':'bm'}">${l.operation||'–'}</span></td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.72rem" title="${l.object_name||''}">${l.object_name||'–'}</td>
+        <td style="font-size:.72rem">${sz}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="8" style="color:var(--muted);text-align:center">No events</td></tr>';
+
+    document.getElementById('tl-total').textContent = logs.length;
+    document.getElementById('tl-exfil').textContent = exfilCount;
+    const first = logs[0]?.timestamp?.slice(0,19).replace('T',' ') || '–';
+    const last  = logs[logs.length-1]?.timestamp?.slice(0,19).replace('T',' ') || '–';
+    document.getElementById('tl-first').textContent = first;
+    document.getElementById('tl-last').textContent  = last;
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);text-align:center">Error: ${e.message}</td></tr>`;
+  }
+}
+</script>
+
+<script>
+// ── Evidence ──────────────────────────────────────────────────────────────────
+async function loadEvidence() {
+  const container = document.getElementById('ev-cards');
+  container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">Loading…</div>';
+  try {
+    const sev = document.getElementById('ev-sev').value;
+    const d = await fetch(`/api/alerts?min_severity=${sev}`).then(r=>r.json());
+    document.getElementById('ev-count').textContent = d.count || 0;
+
+    const ICON = {CRITICAL:'skull',HIGH:'triangle-exclamation',MEDIUM:'circle-exclamation',LOW:'info-circle'};
+    const alerts = d.alerts || [];
+    if (!alerts.length) {
+      container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:24px"><i class="fas fa-check-circle" style="color:var(--green)"></i> No evidence matching filter.</div>';
+      return;
+    }
+    container.innerHTML = alerts.map((a,i) => {
+      const s = a.severity||'LOW';
+      const cls = {CRITICAL:'',HIGH:'high',MEDIUM:'medium',LOW:'low'}[s]||'';
+      const ts = (a.detected_at||'').replace('T',' ').slice(0,19);
+      const ev = (() => { try { return typeof a.evidence==='string' ? JSON.parse(a.evidence) : a.evidence; } catch { return {}; } })();
+      const evStr = Object.entries(ev||{}).map(([k,v])=>`<span style="color:var(--muted)">${k}:</span> <strong>${Array.isArray(v)?v.join(', '):v}</strong>`).join(' · ');
+      return `<div class="evidence-card ${cls}">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="font-size:1.1rem;margin-top:1px;color:${s==='CRITICAL'?'var(--red)':s==='HIGH'?'var(--orange)':'var(--muted)'}">
+            <i class="fas fa-${ICON[s]||'info-circle'}"></i>
+          </div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+              <span style="font-size:.65rem;color:var(--muted)">#${String(i+1).padStart(3,'0')}</span>
+              <span class="badge b${s[0].toLowerCase()}">${s}</span>
+              <span style="font-weight:700;font-size:.85rem">${(a.anomaly_type||'').replace(/_/g,' ')}</span>
+              <span style="color:var(--muted);font-size:.72rem;margin-left:auto">${ts}</span>
+            </div>
+            <div style="font-size:.8rem;margin-bottom:5px">${a.description||'–'}</div>
+            <div style="font-size:.72rem;color:var(--muted)">
+              Suspect: <strong style="color:#93c5fd">${a.user_id||'–'}</strong>
+              ${a.source_ip&&a.source_ip!=='unknown'?` · IP: <strong>${a.source_ip}</strong>`:''}
+              ${evStr?` · ${evStr}`:''}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = `<div style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+// ── Simulate ──────────────────────────────────────────────────────────────────
+async function runSim() {
+  const scenario = document.getElementById('sim-scenario').value;
+  const attacker = document.getElementById('sim-attacker').value.trim() || 'attacker1';
+  const files    = parseInt(document.getElementById('sim-files').value) || 5;
+  const el = document.getElementById('sim-result');
+  el.style.display = 'block'; el.style.color = 'var(--muted)';
+  el.textContent = 'Launching simulation…';
+  try {
+    const r = await fetch('/api/simulate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({scenario, attacker, files})
+    });
+    const d = await r.json();
+    if (r.ok) {
+      el.style.color = 'var(--green)';
+      el.textContent = `✓ Started (PID ${d.pid}) — scenario: ${d.scenario}, attacker: ${d.attacker}. Refresh Case Overview in a few seconds.`;
+      toast('Simulation launched!');
+    } else {
+      el.style.color = 'var(--red)';
+      el.textContent = 'Error: ' + (d.error||'Unknown');
+    }
+  } catch(e) { el.style.color='var(--red)'; el.textContent='Error: '+e.message; }
+}
+
+// ── Raw Logs ──────────────────────────────────────────────────────────────────
+let logCurrentPage = 1;
+async function loadLogs(page) {
+  if (page) logCurrentPage = page;
+  const tbody = document.getElementById('log-body');
+  tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Loading…</td></tr>';
+  try {
+    const user = document.getElementById('log-user').value.trim();
+    const ip   = document.getElementById('log-ip').value.trim();
+    const op   = document.getElementById('log-op').value;
+    const src  = document.getElementById('log-src').value;
+    let url = `/api/logs/raw?page=${logCurrentPage}&per_page=50`;
+    if (user) url += `&user=${encodeURIComponent(user)}`;
+    if (ip)   url += `&ip=${encodeURIComponent(ip)}`;
+    if (op)   url += `&operation=${encodeURIComponent(op)}`;
+    if (src)  url += `&source=${encodeURIComponent(src)}`;
+    const d = await fetch(url).then(r => r.json());
+    document.getElementById('log-total').textContent = d.total || 0;
+    document.getElementById('log-page-info').textContent = `${d.page}/${d.pages||1}`;
+    document.getElementById('log-prev').disabled = d.page <= 1;
+    document.getElementById('log-next').disabled = d.page >= (d.pages||1);
+
+    const OP_COLOR = {GET:'bs',PUT:'bm',DELETE:'bc',EXFIL_USB:'bc',LOGIN_FAILED:'bc',PROPFIND:'bl',COPY:'bm',USB_CONNECT:'bh'};
+    const SRC_LABEL = {nextcloud:'Nextcloud',cert_dataset:'CERT File',cert_logon:'CERT Logon',cert_device:'CERT Device',cert_logon_csv:'CERT Logon'};
+    tbody.innerHTML = (d.logs||[]).map((l,i) => {
+      const ts = (l.timestamp||'').replace('T',' ').slice(0,19);
+      const sz = l.file_size > 0 ? (l.file_size >= 1048576 ? (l.file_size/1048576).toFixed(1)+'MB' : (l.file_size/1024).toFixed(1)+'KB') : '–';
+      const bkt = l.bucket||'';
+      const srcLabel = SRC_LABEL[bkt] || bkt || '–';
+      const srcColor = bkt.startsWith('cert') ? 'var(--purple)' : 'var(--accent)';
+      const opCls = OP_COLOR[l.operation] || 'bs';
+      return `<tr>
+        <td style="color:var(--muted);font-size:.7rem">${(logCurrentPage-1)*50+i+1}</td>
+        <td style="white-space:nowrap;font-size:.72rem">${ts}</td>
+        <td style="font-weight:600;color:#93c5fd">${l.user_id||'–'}</td>
+        <td style="font-size:.72rem">${l.source_ip||'–'}</td>
+        <td><span class="badge ${opCls}">${l.operation||'–'}</span></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.72rem" title="${l.object_name||''}">${l.object_name||'–'}</td>
+        <td style="font-size:.72rem">${sz}</td>
+        <td style="font-size:.7rem;color:${srcColor}">${srcLabel}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="8" style="color:var(--muted);text-align:center">No records</td></tr>';
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);text-align:center">Error: ${e.message}</td></tr>`;
+  }
+}
+function logPage(dir) { loadLogs(Math.max(1, logCurrentPage + dir)); }
+
+// ── Dataset ───────────────────────────────────────────────────────────────────
+async function loadDataset() {
+  try {
+    const [summary, cert] = await Promise.all([
+      fetch('/api/dataset/summary').then(r => r.json()),
+      fetch('/api/dataset/cert-sample').then(r => r.json()),
+    ]);
+
+    // Source cards
+    const SRC_ICON = {'CERT-InsiderThreat':'user-secret','Nextcloud':'cloud','cert_logon':'sign-in-alt','cert_device':'usb'};
+    const SRC_COLOR = {'CERT-InsiderThreat':'var(--purple)','Nextcloud':'var(--accent)'};
+    const container = document.getElementById('ds-source-cards');
+    container.innerHTML = Object.entries(summary.sources||{}).map(([src, v]) => {
+      const icon = SRC_ICON[src] || 'database';
+      const color = SRC_COLOR[src] || 'var(--muted)';
+      const topOps = Object.entries(v.operations||{}).sort((a,b)=>b[1]-a[1]).slice(0,3)
+        .map(([op,n])=>`<span class="badge bs" style="margin-right:3px">${op}</span><span style="color:var(--muted)">×${n}</span>`).join(' ');
+      return `<div class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="width:36px;height:36px;background:${color}22;border-radius:8px;display:flex;align-items:center;justify-content:center">
+            <i class="fas fa-${icon}" style="color:${color}"></i>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:.85rem">${src}</div>
+            <div style="font-size:.7rem;color:var(--muted)">${v.unique_users} user(s)</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.78rem;margin-bottom:10px">
+          <div><div style="color:var(--muted)">Events</div><strong style="font-size:1.2rem">${v.events}</strong></div>
+          <div><div style="color:var(--muted)">Users</div><strong style="font-size:1.2rem">${v.unique_users}</strong></div>
+        </div>
+        <div style="font-size:.7rem">${topOps}</div>
+        <div style="margin-top:8px;font-size:.7rem;color:var(--muted)">${(v.users||[]).slice(0,4).join(', ')}${v.users.length>4?` +${v.users.length-4} more`:''}</div>
+      </div>`;
+    }).join('') || '<div style="color:var(--muted)">No data</div>';
+
+    // CERT sample info
+    if (cert.error) {
+      document.getElementById('ds-cert-info').innerHTML = `<span style="color:var(--orange)">${cert.error}</span>`;
+    } else {
+      const userRows = Object.entries(cert.users||{}).map(([u,d]) =>
+        `<tr><td style="font-weight:600;color:#93c5fd">${u}</td><td>${d.events}</td>
+         <td style="color:${d.exfil>0?'var(--red)':'var(--muted)'};font-weight:${d.exfil>0?700:400}">${d.exfil > 0 ? '⚠ '+d.exfil+' USB exfil' : '–'}</td></tr>`
+      ).join('');
+      document.getElementById('ds-cert-info').innerHTML =
+        `<strong style="color:var(--text)">${cert.total_records}</strong> records · ${Object.keys(cert.users||{}).length} users`;
+      document.getElementById('ds-cert-table').innerHTML = `
+        <table><thead><tr><th>User</th><th>Events</th><th>Exfiltration</th></tr></thead>
+        <tbody>${userRows}</tbody></table>`;
+    }
+  } catch(e) { toast('Dataset error: '+e.message, 'var(--red)'); }
+}
+
+// ── ML Analysis ───────────────────────────────────────────────────────────────
+async function loadML() {
+  try {
+    const d = await fetch('/api/ml/summary').then(r => r.json());
+    if (d.error) {
+      document.getElementById('ml-model-cards').innerHTML = `<div style="color:var(--orange);font-size:.8rem">${d.error}</div>`;
+      return;
+    }
+
+    const METRIC_COLOR = v => v >= 0.95 ? 'var(--green)' : v >= 0.85 ? 'var(--yellow)' : 'var(--orange)';
+    const container = document.getElementById('ml-model-cards');
+    container.innerHTML = Object.entries(d.models||{}).map(([name, m]) => {
+      const metrics = [
+        ['Accuracy', m.test_accuracy], ['Precision', m.precision],
+        ['Recall', m.recall], ['F1-Score', m.f1], ['ROC-AUC', m.roc_auc],
+      ];
+      const bars = metrics.map(([label, val]) => `
+        <div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin-bottom:2px">
+            <span>${label}</span><span style="color:${METRIC_COLOR(val)};font-weight:700">${(val*100).toFixed(1)}%</span>
+          </div>
+          <div style="background:var(--bg);border-radius:3px;height:4px">
+            <div style="background:${METRIC_COLOR(val)};width:${(val*100).toFixed(1)}%;height:4px;border-radius:3px;transition:width .5s"></div>
+          </div>
+        </div>`).join('');
+      const icon = name==='RandomForest'?'tree':name==='GradientBoosting'?'rocket':'chart-line';
+      return `<div class="card">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+          <i class="fas fa-${icon}" style="color:var(--accent);font-size:1.1rem"></i>
+          <div style="font-weight:700;font-size:.85rem">${name}</div>
+        </div>
+        ${bars}
+      </div>`;
+    }).join('');
+
+    // Training info
+    document.getElementById('ml-ts').textContent = (d.timestamp||'–').slice(0,19).replace('T',' ');
+    document.getElementById('ml-train-n').textContent = d.train_size || '–';
+    document.getElementById('ml-test-n').textContent  = d.test_size  || '–';
+    document.getElementById('ml-feats').textContent   = d.features   || '–';
+
+    // Feature list
+    document.getElementById('ml-feature-list').innerHTML = (d.feature_names||[]).map(f =>
+      `<span style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:3px 8px;color:var(--muted)">${f}</span>`
+    ).join('');
+  } catch(e) { toast('ML error: '+e.message, 'var(--red)'); }
+}
+
+async function runMLPredict() {
+  const el = document.getElementById('ml-pred-result');
+  el.style.display = 'block';
+  el.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Predicting…';
+  try {
+    const payload = {
+      timestamp: new Date().toISOString(),
+      user: document.getElementById('ml-user').value,
+      source_ip: document.getElementById('ml-ip').value,
+      object: document.getElementById('ml-obj').value,
+      bytes_transferred: parseFloat(document.getElementById('ml-bytes').value) * 1024 * 1024,
+      action: document.getElementById('ml-action').value,
+    };
+    const d = await fetch('/api/ml/predict', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    }).then(r => r.json());
+    if (d.error) { el.innerHTML = `<span style="color:var(--red)">${d.error}</span>`; return; }
+
+    const ens = d.ensemble || {};
+    const isAnomaly = ens.prediction === 1;
+    const prob = ((ens.probability||0)*100).toFixed(1);
+    const color = isAnomaly ? 'var(--red)' : 'var(--green)';
+    const modelRows = Object.entries(d).filter(([k])=>k!=='ensemble').map(([name,m]) =>
+      `<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:3px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--muted)">${name}</span>
+        <span style="color:${m.prediction?'var(--red)':'var(--green)'};font-weight:700">${m.prediction?'ANOMALY':'NORMAL'} (${(m.probability*100).toFixed(1)}%)</span>
+      </div>`
+    ).join('');
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div style="font-size:2rem;color:${color}">${isAnomaly?'🚨':'✅'}</div>
+        <div>
+          <div style="font-size:1rem;font-weight:800;color:${color}">${isAnomaly?'ANOMALY DETECTED':'NORMAL'}</div>
+          <div style="font-size:.75rem;color:var(--muted)">Ensemble confidence: <strong style="color:${color}">${prob}%</strong></div>
+        </div>
+      </div>
+      <div>${modelRows}</div>`;
+  } catch(e) { el.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`; }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+function init() {
+  loadOverview();
+  setInterval(() => { if (currentPage==='overview') loadOverview(); }, 30000);
+}
+</script>
+</body>
+</html>

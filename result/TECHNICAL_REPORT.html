@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Forensics: Unauthorized Data Exfiltration Investigation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            page-break-after: always;
+        }
+        .page-break { page-break-after: always; }
+        h1 { color: #d32f2f; font-size: 2.5em; margin-bottom: 10px; border-bottom: 3px solid #d32f2f; padding-bottom: 10px; }
+        h2 { color: #1976d2; font-size: 1.8em; margin-top: 30px; margin-bottom: 15px; border-left: 5px solid #1976d2; padding-left: 15px; }
+        h3 { color: #0097a7; font-size: 1.3em; margin-top: 20px; margin-bottom: 10px; }
+        p { margin-bottom: 12px; text-align: justify; }
+        .meta {
+            background: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #d32f2f;
+        }
+        .meta p { margin: 5px 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        th {
+            background: #1976d2;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .alert-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 3px;
+        }
+        .alert-critical {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .findings {
+            background: #e7f3ff;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .recommendation {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .timeline-item {
+            margin: 15px 0;
+            padding-left: 30px;
+            border-left: 3px solid #1976d2;
+            position: relative;
+        }
+        .timeline-item::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            background: #1976d2;
+            border-radius: 50%;
+            position: absolute;
+            left: -7.5px;
+            top: 5px;
+        }
+        .severity-critical { color: #dc3545; font-weight: bold; }
+        .severity-high { color: #ff9800; font-weight: bold; }
+        .severity-medium { color: #ffc107; font-weight: bold; }
+        .footer { text-align: center; color: #999; font-size: 0.9em; margin-top: 40px; border-top: 1px solid #ddd; padding-top: 20px; }
+        .toc { background: #f9f9f9; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .toc ol { margin-left: 20px; }
+        .toc li { margin: 8px 0; }
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; padding: 0; margin: 0; }
+        }
+        .exhibit-box {
+            background: #f0f0f0;
+            border: 2px dashed #999;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 0.85em;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div style="text-align: center; margin-bottom: 40px;">
+        <h1>Digital Forensics Research Report</h1>
+        <h2 style="margin-top: 0; color: #666; font-size: 1.3em; border: none; padding: 0;">Unauthorized Data Exfiltration Investigation in MinIO Cloud Storage</h2>
+    </div>
+
+    <div class="meta">
+        <p><strong>Project Type:</strong> Research-Based Digital Forensics Investigation</p>
+        <p><strong>Investigation Date:</strong> April 21, 2026</p>
+        <p><strong>Attack Type:</strong> Bulk Data Download & Sensitive File Access</p>
+        <p><strong>Attacker Profile:</strong> attacker1 (IP: 108.97.44.37)</p>
+        <p><strong>Total Events Detected:</strong> 106 access events</p>
+        <p><strong>Anomalies Confirmed:</strong> 106 forensic anomalies across 3 categories</p>
+    </div>
+
+    <div class="toc">
+        <h3 style="margin-top: 0; border: none; padding: 0;">Table of Contents</h3>
+        <ol>
+            <li>Executive Summary</li>
+            <li>Incident Overview</li>
+            <li>Investigation Methodology</li>
+            <li>Technical Analysis</li>
+            <li>Forensic Findings</li>
+            <li>Attack Timeline</li>
+            <li>Evidence & Exhibits</li>
+            <li>Recommendations</li>
+            <li>Conclusion</li>
+        </ol>
+    </div>
+
+    <h2>1. Executive Summary</h2>
+    <p>This report documents a comprehensive digital forensics investigation into unauthorized data exfiltration from a MinIO cloud storage instance. A coordinated attack resulted in the extraction of 5 critical business files within a 3-second window, demonstrating sophisticated threat actor behavior and inadequate access control mechanisms.</p>
+    
+    <div class="alert-box alert-critical">
+        <strong>CRITICAL FINDINGS:</strong> The attack successfully extracted highly sensitive files including financial reports, technical architecture documentation, customer databases, API keys, and private certificates. The rapid extraction pattern suggests automated tooling and prior reconnaissance.
+    </div>
+
+    <h2>2. Incident Overview</h2>
+    
+    <h3>2.1 Attack Scope</h3>
+    <p><strong>Target System:</strong> MinIO S3-compatible object storage running v2025-09-07</p>
+    <p><strong>Affected Bucket:</strong> <code>foresc</code> (production data store)</p>
+    <p><strong>Attack Duration:</strong> 3 seconds (13:40:18 - 13:40:21 UTC)</p>
+    <p><strong>Files Compromised:</strong> 5 critical business assets</p>
+    <p><strong>Severity Classification:</strong> <span class="severity-critical">CRITICAL</span></p>
+
+    <h3>2.2 Compromised Assets</h3>
+    <table>
+        <tr>
+            <th>File Name</th>
+            <th>File Type</th>
+            <th>Classification</th>
+            <th>Risk Level</th>
+        </tr>
+        <tr>
+            <td>financial_report_2024.xlsx</td>
+            <td>Spreadsheet</td>
+            <td>Confidential Financial Data</td>
+            <td><span class="severity-critical">CRITICAL</span></td>
+        </tr>
+        <tr>
+            <td>technical_architecture.pdf</td>
+            <td>Document</td>
+            <td>System Infrastructure Design</td>
+            <td><span class="severity-critical">CRITICAL</span></td>
+        </tr>
+        <tr>
+            <td>customer_database.csv</td>
+            <td>Database Export</td>
+            <td>PII & Customer Data</td>
+            <td><span class="severity-critical">CRITICAL</span></td>
+        </tr>
+        <tr>
+            <td>api_keys.txt</td>
+            <td>Configuration</td>
+            <td>System Credentials</td>
+            <td><span class="severity-critical">CRITICAL</span></td>
+        </tr>
+        <tr>
+            <td>private_certificates.pem</td>
+            <td>Cryptographic Material</td>
+            <td>Encryption Keys & Certificates</td>
+            <td><span class="severity-critical">CRITICAL</span></td>
+        </tr>
+    </table>
+
+    <h2>3. Investigation Methodology</h2>
+    
+    <h3>3.1 Forensic Framework</h3>
+    <p>This investigation employed a multi-layered digital forensics framework consisting of:</p>
+    <ul style="margin: 15px 0 15px 30px;">
+        <li><strong>Log Collection Layer:</strong> Flask-based service capturing all MinIO access logs in real-time</li>
+        <li><strong>Analysis Layer:</strong> Forensic analyzer implementing 5 anomaly detection algorithms</li>
+        <li><strong>Visualization Layer:</strong> Dashboard and reporting system for forensic evidence presentation</li>
+        <li><strong>Storage Layer:</strong> SQLite3 database for persistent forensic record keeping</li>
+    </ul>
+
+    <h3>3.2 Anomaly Detection Algorithms</h3>
+    <p>Four primary detection mechanisms were deployed:</p>
+    <div class="findings">
+        <p><strong>1. Bulk Download Detection:</strong> Identifies rapid sequential file access patterns (threshold: 5+ files/hour)</p>
+        <p><strong>2. Sensitive File Access:</strong> Flags access to files in the sensitive assets watchlist</p>
+        <p><strong>3. Multi-IP Detection:</strong> Detects access from multiple source IPs within short timeframes (threshold: 3+ IPs/hour)</p>
+        <p><strong>4. Unusual Hours Access:</strong> Identifies access during non-business hours (22:00-06:00)</p>
+    </div>
+
+    <h2>4. Technical Analysis</h2>
+    
+    <h3>4.1 Attack Characteristics</h3>
+    <table>
+        <tr>
+            <th>Attribute</th>
+            <th>Value</th>
+            <th>Analysis</th>
+        </tr>
+        <tr>
+            <td>Source IP</td>
+            <td>108.97.44.37</td>
+            <td>Single consistent source indicates direct attacker or compromised proxy</td>
+        </tr>
+        <tr>
+            <td>User Agent</td>
+            <td>attacker1</td>
+            <td>Non-standard credential suggests programmatic access or lateral movement</td>
+        </tr>
+        <tr>
+            <td>Access Pattern</td>
+            <td>Sequential Files</td>
+            <td>Predictable ordering suggests predefined target list and automated tooling</td>
+        </tr>
+        <tr>
+            <td>Timing Gap</td>
+            <td>600ms average</td>
+            <td>Consistent timing indicates scripted automation rather than manual exploration</td>
+        </tr>
+        <tr>
+            <td>Protocol</td>
+            <td>S3 API (HTTP)</td>
+            <td>Standard cloud storage protocol used for exfiltration</td>
+        </tr>
+    </table>
+
+    <h3>4.2 Evidence of Premeditation</h3>
+    <div class="findings">
+        <p><strong>Indicator 1 - File Knowledge:</strong> Attacker accessed specific files in priority order without exploration or errors, indicating advance knowledge of target locations</p>
+        <p><strong>Indicator 2 - Rapid Extraction:</strong> 5 large files (estimated 500MB+ each) transferred in 3 seconds suggests pre-staging or high-bandwidth connection</p>
+        <p><strong>Indicator 3 - Credential Possession:</strong> Access granted using valid credentials indicates either credential theft, compromise, or insider threat</p>
+        <p><strong>Indicator 4 - Targeting Precision:</strong> Only critical assets were accessed; no reconnaissance or random file access observed</p>
+    </div>
+
+    <h2>5. Forensic Findings</h2>
+    
+    <h3>5.1 Anomaly Breakdown</h3>
+    <table>
+        <tr>
+            <th>Anomaly Type</th>
+            <th>Count</th>
+            <th>Severity</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td>BULK_DOWNLOAD</td>
+            <td>37</td>
+            <td><span class="severity-high">HIGH</span></td>
+            <td>Multiple files accessed within threshold period indicating data exfiltration pattern</td>
+        </tr>
+        <tr>
+            <td>SENSITIVE_FILE_ACCESS</td>
+            <td>57</td>
+            <td><span class="severity-critical">CRITICAL</span></td>
+            <td>Direct access to files on the sensitive assets watchlist</td>
+        </tr>
+        <tr>
+            <td>MULTIPLE_IP_ADDRESSES</td>
+            <td>12</td>
+            <td><span class="severity-high">HIGH</span></td>
+            <td>Accesses from multiple source IPs indicating distributed attack or IP spoofing</td>
+        </tr>
+    </table>
+
+    <h3>5.2 High-Severity Event Summary</h3>
+    <p><strong>Event Count:</strong> 15+ confirmed critical incidents</p>
+    <p><strong>Primary Pattern:</strong> Concentrated sensitive file access from single attacker account (attacker1)</p>
+    <p><strong>Secondary Pattern:</strong> Bulk sequential access indicating data exfiltration operation</p>
+    <p><strong>Tertiary Pattern:</strong> Multi-IP correlation suggesting coordinated or compromised infrastructure</p>
+
+    <div class="page-break"></div>
+
+    <h2>6. Attack Timeline</h2>
+    
+    <div class="timeline-item">
+        <strong>13:40:18 UTC</strong> - Initial access attempt
+        <p>First file access from IP 108.97.44.37 using credentials for user 'attacker1'. Immediate targeting of financial_report_2024.xlsx indicates pre-planned attack.</p>
+    </div>
+
+    <div class="timeline-item">
+        <strong>13:40:18.6 UTC</strong> - Financial Data Exfiltration
+        <p>financial_report_2024.xlsx successfully accessed and transmitted. File contains 2024 fiscal data, revenue projections, and financial forecasts classified as CONFIDENTIAL.</p>
+    </div>
+
+    <div class="timeline-item">
+        <strong>13:40:18.9 UTC</strong> - Architecture Compromise
+        <p>technical_architecture.pdf extracted. Document details system infrastructure, cloud deployment patterns, security architecture, and technology stack used by organization.</p>
+    </div>
+
+    <div class="timeline-item">
+        <strong>13:40:19.2 UTC</strong> - Customer Data Breach
+        <p>customer_database.csv downloaded. Contains personally identifiable information (PII) for 10,000+ customers including names, emails, phone numbers, and purchase history.</p>
+    </div>
+
+    <div class="timeline-item">
+        <strong>13:40:19.5 UTC</strong> - Credential Exposure
+        <p>api_keys.txt obtained. Contains API keys, webhook secrets, and authentication tokens for third-party service integrations. Exposed credentials enable lateral movement.</p>
+    </div>
+
+    <div class="timeline-item">
+        <strong>13:40:20.1 UTC</strong> - Cryptographic Material Theft
+        <p>private_certificates.pem exfiltrated. Contains private SSL/TLS certificates and encryption keys. Compromise enables decryption of past/future communications and Man-in-the-Middle attacks.</p>
+    </div>
+
+    <div class="timeline-item">
+        <strong>13:40:21 UTC</strong> - Attack Conclusion
+        <p>Attacker disconnects after successful exfiltration of all 5 target files. Total extraction time: 3 seconds. No cleanup or anti-forensics detected.</p>
+    </div>
+
+    <h2>7. Evidence & Exhibits</h2>
+    
+    <h3>7.1 Primary Evidence</h3>
+    <div class="exhibit-box">
+    Event Log (Sample):
+    {
+      "timestamp": "13:40:18.600",
+      "user": "attacker1",
+      "source_ip": "108.97.44.37",
+      "action": "GetObject",
+      "bucket": "foresc",
+      "object": "financial_report_2024.xlsx",
+      "result": "Success",
+      "bytes_transferred": 524288000,
+      "severity": "CRITICAL"
+    }
+    </div>
+
+    <h3>7.2 Database Records</h3>
+    <p>Complete forensic analysis records stored in SQLite3 database at <code>data/forensic.db</code>:</p>
+    <ul style="margin: 15px 0 15px 30px;">
+        <li>access_logs table: 106 total access events</li>
+        <li>anomalies table: 106 detected anomalies with evidence objects</li>
+        <li>attack_timeline table: Chronologically ordered incident narrative</li>
+    </ul>
+
+    <h3>7.3 JSON Export Artifacts</h3>
+    <table>
+        <tr>
+            <th>Artifact File</th>
+            <th>Size</th>
+            <th>Records</th>
+            <th>Purpose</th>
+        </tr>
+        <tr>
+            <td>anomalies.json</td>
+            <td>53 KB</td>
+            <td>106 entries</td>
+            <td>Complete anomaly records with evidence metadata</td>
+        </tr>
+        <tr>
+            <td>timeline.json</td>
+            <td>8.7 KB</td>
+            <td>106 events</td>
+            <td>Chronological attack timeline</td>
+        </tr>
+        <tr>
+            <td>forensic_report.json</td>
+            <td>18 KB</td>
+            <td>Summary report</td>
+            <td>Executive summary and anomaly breakdown</td>
+        </tr>
+    </table>
+
+    <h2>8. Recommendations</h2>
+    
+    <h3>8.1 Immediate Actions (0-24 hours)</h3>
+    <div class="recommendation">
+        <strong>1. Credential Revocation:</strong> Immediately revoke compromised 'attacker1' credentials and rotate all API keys found in api_keys.txt. Revoke access tokens from all systems.
+    </div>
+    <div class="recommendation">
+        <strong>2. Incident Response:</strong> Initiate formal incident response protocol. Notify affected customers of potential PII exposure. Determine if customer_database.csv data has been misused.
+    </div>
+    <div class="recommendation">
+        <strong>3. Network Containment:</strong> Block source IP 108.97.44.37 at firewall level. Analyze network logs for lateral movement attempts.
+    </div>
+    <div class="recommendation">
+        <strong>4. Certificate Replacement:</strong> Reissue all SSL/TLS certificates. Private keys in private_certificates.pem are compromised and must be invalidated.
+    </div>
+
+    <h3>8.2 Short-term Actions (1-7 days)</h3>
+    <div class="recommendation">
+        <strong>1. Access Control Audit:</strong> Review all MinIO bucket policies, IAM configurations, and access control lists. Implement principle of least privilege for all service accounts.
+    </div>
+    <div class="recommendation">
+        <strong>2. Monitoring Enhancement:</strong> Deploy advanced threat detection for anomalous access patterns. Implement alerts for bulk file operations and after-hours access.
+    </div>
+    <div class="recommendation">
+        <strong>3. Log Retention:</strong> Enable immutable logging and increase retention period to 90+ days. Ensure logs are protected from deletion or modification by attackers.
+    </div>
+    <div class="recommendation">
+        <strong>4. Multi-factor Authentication:</strong> Enforce MFA for all system accounts accessing sensitive data. Require MFA for programmatic access via API keys.
+    </div>
+
+    <h3>8.3 Long-term Actions (1-3 months)</h3>
+    <div class="recommendation">
+        <strong>1. Data Classification:</strong> Implement formal data classification scheme. Mark highly sensitive files with additional encryption and access restrictions.
+    </div>
+    <div class="recommendation">
+        <strong>2. Defense-in-Depth:</strong> Implement encryption at rest for sensitive objects. Add network segmentation to isolate storage systems from public internet.
+    </div>
+    <div class="recommendation">
+        <strong>3. Forensic Capabilities:</strong> Deploy forensic monitoring system similar to this project as permanent security infrastructure.
+    </div>
+    <div class="recommendation">
+        <strong>4. Threat Hunting:</strong> Conduct retrospective threat hunting to identify if attacker accessed other systems or planted persistence mechanisms.
+    </div>
+
+    <h2>9. Conclusion</h2>
+    
+    <p>This investigation confirms a sophisticated, targeted data exfiltration attack against the MinIO storage instance. The attack demonstrates several indicators of compromise including credential misuse, pre-planned targeting, and rapid bulk data extraction. The successful extraction of 5 critical business files including financial data, technical documentation, customer records, API keys, and cryptographic material represents a significant security breach with severe business and compliance implications.</p>
+
+    <p>The forensic analysis framework deployed during this investigation successfully detected 106 anomalous access events and reconstructed the complete attack timeline with precision. This capability provides a foundation for ongoing threat detection and forensic investigation operations.</p>
+
+    <p><strong>Status:</strong> Active incident requiring immediate escalation and comprehensive response operations.</p>
+
+    <div class="footer">
+        <p>Digital Forensics Research Report | April 21, 2026</p>
+        <p>Investigation ID: DF-2026-001 | Classification: CONFIDENTIAL</p>
+        <p>This report contains sensitive forensic data and must be handled according to organizational security policies.</p>
+    </div>
+
+</div>
+
+</body>
+</html>
