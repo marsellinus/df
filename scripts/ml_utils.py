@@ -48,7 +48,7 @@ def setup_logger(name: str, log_file: str = None) -> logging.Logger:
 
 def get_db_connection(db_path: str):
     """Create and configure SQLite database connection"""
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=30); conn.execute("PRAGMA journal_mode=WAL"); conn.row_factory = sqlite3.Row
     conn.row_factory = sqlite3.Row
     return conn
 

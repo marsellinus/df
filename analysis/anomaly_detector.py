@@ -163,7 +163,7 @@ def run_all_detectors(logs: List[Dict], user_profiles: Dict) -> List[Dict]:
 
     # Replace existing anomalies in DB for this run (avoid accumulation across calls)
     import sqlite3
-    conn = sqlite3.connect(DATA_DIR / 'forensic.db')
+    conn = sqlite3.connect(DATA_DIR / 'forensic.db', timeout=30); conn.execute("PRAGMA journal_mode=WAL"); conn.row_factory = sqlite3.Row
     conn.execute('DELETE FROM anomalies')
     conn.commit()
     conn.close()

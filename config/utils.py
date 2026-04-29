@@ -49,10 +49,19 @@ class DatabaseHelper:
     def __init__(self, db_path: Path):
         self.db_path = db_path
         self._create_tables()
-    
+
+    def _connect(self):
+        """Buka koneksi dengan WAL mode dan timeout untuk mencegah 'database is locked'."""
+        conn = sqlite3.connect(self.db_path, timeout=30,
+                               check_same_thread=False)
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        conn.row_factory = sqlite3.Row
+        return conn
+
     def _create_tables(self):
         """Create forensic analysis tables"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
         
         # Access logs table
@@ -107,7 +116,7 @@ class DatabaseHelper:
     
     def insert_access_log(self, log_data: Dict[str, Any]):
         """Insert access log entry"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
         
         try:
@@ -134,7 +143,7 @@ class DatabaseHelper:
     
     def get_all_logs(self) -> List[Dict]:
         """Get all access logs"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -146,7 +155,7 @@ class DatabaseHelper:
     
     def insert_anomaly(self, anomaly_data: Dict[str, Any]):
         """Record detected anomaly"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -168,7 +177,7 @@ class DatabaseHelper:
     
     def get_anomalies(self) -> List[Dict]:
         """Get all detected anomalies"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         

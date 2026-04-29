@@ -166,7 +166,7 @@ def get_all_parsed_logs() -> list:
 
 
 def get_logs_for_user(user_id: str) -> list:
-    conn = sqlite3.connect(DATA_DIR / 'forensic.db')
+    conn = sqlite3.connect(DATA_DIR / 'forensic.db', timeout=30); conn.execute("PRAGMA journal_mode=WAL"); conn.row_factory = sqlite3.Row
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute('SELECT * FROM access_logs WHERE user_id=? ORDER BY timestamp', (user_id,))
@@ -176,7 +176,7 @@ def get_logs_for_user(user_id: str) -> list:
 
 
 def get_logs_for_ip(ip: str) -> list:
-    conn = sqlite3.connect(DATA_DIR / 'forensic.db')
+    conn = sqlite3.connect(DATA_DIR / 'forensic.db', timeout=30); conn.execute("PRAGMA journal_mode=WAL"); conn.row_factory = sqlite3.Row
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute('SELECT * FROM access_logs WHERE source_ip=? ORDER BY timestamp', (ip,))
@@ -187,7 +187,7 @@ def get_logs_for_ip(ip: str) -> list:
 
 def get_logs_in_range(start: str, end: str) -> list:
     """start/end are ISO timestamp strings."""
-    conn = sqlite3.connect(DATA_DIR / 'forensic.db')
+    conn = sqlite3.connect(DATA_DIR / 'forensic.db', timeout=30); conn.execute("PRAGMA journal_mode=WAL"); conn.row_factory = sqlite3.Row
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute(

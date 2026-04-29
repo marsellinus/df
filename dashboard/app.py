@@ -89,8 +89,11 @@ def risk_score():
 def reconstruction():
     try:
         from main import run_pipeline
-        return jsonify(run_pipeline())
+        logs = get_all_parsed_logs()
+        report = run_pipeline(logs)
+        return jsonify(report)
     except Exception as e:
+        logger.error(f"reconstruction: {e}")
         return jsonify({'error': str(e)}), 500
 
 
