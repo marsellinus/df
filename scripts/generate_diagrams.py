@@ -395,6 +395,210 @@ def fig_cross_source():
     savefig('cross_source_correlation.png')
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. User Risk Score Bar Chart
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_user_risk():
+    users  = ['alice', 'unknown', 'TGT-ACM2278', 'TGT-DPM0562', 'TGT-CJL1847', 'TGT-BDK0391', 'admin']
+    scores = [76, 63, 45, 42, 42, 42, 35]
+    colors_map = {range(80,101): RED, range(60,80): ORANGE,
+                  range(40,60): YELLOW, range(0,40): GREEN}
+    bar_colors = []
+    for s in scores:
+        for r, c in colors_map.items():
+            if s in r:
+                bar_colors.append(c); break
+
+    fig, ax = plt.subplots(figsize=(10, 4.5))
+    fig.patch.set_facecolor(DARK); ax.set_facecolor(DARK)
+    bars = ax.barh(users[::-1], scores[::-1], color=bar_colors[::-1], alpha=0.85, zorder=3)
+    for bar, score in zip(bars, scores[::-1]):
+        ax.text(bar.get_width() + 1, bar.get_y() + bar.get_height()/2,
+                str(score), va='center', fontsize=9, color=TEXT)
+    ax.set_xlim(0, 110)
+    ax.axvline(x=80, color=RED,    linewidth=1, linestyle='--', alpha=0.6)
+    ax.axvline(x=60, color=ORANGE, linewidth=1, linestyle='--', alpha=0.6)
+    ax.axvline(x=40, color=YELLOW, linewidth=1, linestyle='--', alpha=0.6)
+    ax.text(81, 0.3, 'CRITICAL', color=RED,    fontsize=7, rotation=90)
+    ax.text(61, 0.3, 'HIGH',     color=ORANGE, fontsize=7, rotation=90)
+    ax.text(41, 0.3, 'MEDIUM',   color=YELLOW, fontsize=7, rotation=90)
+    ax.set_xlabel('Risk Score (0–100)', color=MUTED, fontsize=9)
+    ax.set_title('User Risk Score Profile', color=TEXT, fontsize=12, fontweight='bold', pad=10)
+    ax.tick_params(colors=TEXT, labelsize=9)
+    ax.spines[:].set_color(BORDER)
+    ax.xaxis.grid(True, color=BORDER, linewidth=0.5, zorder=0)
+    ax.set_axisbelow(True)
+    savefig('user_risk_scores.png')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. Anomaly Breakdown (stacked bar per user)
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_anomaly_breakdown():
+    users = ['alice', 'unknown', 'admin', 'TGT-ACM2278']
+    bulk  = [15, 287, 9, 0]
+    sens  = [7,  0,   0, 1]
+    offh  = [24, 655, 0, 57]
+    rapid = [0,  872, 25, 0]
+
+    x = np.arange(len(users))
+    w = 0.18
+    fig, ax = plt.subplots(figsize=(10, 5))
+    fig.patch.set_facecolor(DARK); ax.set_facecolor(DARK)
+
+    ax.bar(x - 1.5*w, bulk,  w, label='Bulk Download',       color=RED,    alpha=0.85, zorder=3)
+    ax.bar(x - 0.5*w, sens,  w, label='Sensitive File',       color=ORANGE, alpha=0.85, zorder=3)
+    ax.bar(x + 0.5*w, offh,  w, label='Off-Hours Access',     color=YELLOW, alpha=0.85, zorder=3)
+    ax.bar(x + 1.5*w, rapid, w, label='Rapid Succession',     color=PURPLE, alpha=0.85, zorder=3)
+
+    ax.set_yscale('log')
+    ax.set_xticks(x); ax.set_xticklabels(users, color=TEXT, fontsize=9)
+    ax.set_ylabel('Event Count (log scale)', color=MUTED, fontsize=9)
+    ax.set_title('Anomaly Breakdown per User', color=TEXT, fontsize=12, fontweight='bold', pad=10)
+    ax.tick_params(colors=MUTED)
+    ax.spines[:].set_color(BORDER)
+    ax.yaxis.grid(True, color=BORDER, linewidth=0.5, zorder=0)
+    ax.set_axisbelow(True)
+    ax.legend(facecolor=CARD, edgecolor=BORDER, labelcolor=TEXT, fontsize=8.5)
+    savefig('anomaly_breakdown.png')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Confusion Matrix (Random Forest)
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_confusion_matrix():
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    fig.patch.set_facecolor(DARK)
+    fig.suptitle('Confusion Matrix — All Models (Test Set, 189 samples)',
+                 color=TEXT, fontsize=12, fontweight='bold', y=1.02)
+
+    matrices = [
+        ('Random Forest',       [[169, 0], [1, 19]], GREEN),
+        ('Gradient Boosting',   [[169, 0], [2, 18]], YELLOW),
+        ('Logistic Regression', [[169, 0], [2, 18]], PURPLE),
+    ]
+    labels = ['Normal', 'Anomaly']
+
+    for ax, (title, cm, color) in zip(axes, matrices):
+        ax.set_facecolor(DARK)
+        cm_arr = np.array(cm)
+        im = ax.imshow(cm_arr, cmap='Blues', vmin=0, vmax=170)
+        ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
+        ax.set_xticklabels(['Pred Normal', 'Pred Anomaly'], color=TEXT, fontsize=8)
+        ax.set_yticklabels(['Actual Normal', 'Actual Anomaly'], color=TEXT, fontsize=8)
+        ax.tick_params(colors=MUTED)
+        for i in range(2):
+            for j in range(2):
+                val = cm_arr[i, j]
+                c = TEXT if val < 100 else DARK
+                ax.text(j, i, str(val), ha='center', va='center',
+                        fontsize=16, fontweight='bold', color=c)
+        ax.set_title(title, color=color, fontsize=9.5, fontweight='bold', pad=8)
+        ax.spines[:].set_color(BORDER)
+
+    plt.tight_layout()
+    savefig('confusion_matrix.png')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10. Feature Importance (Random Forest)
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_feature_importance():
+    features = ['is_sensitive_file', 'bytes_mb', 'hour_of_day', 'user_id',
+                'is_large_transfer', 'is_business_hours', 'ip_first_octet',
+                'action_encoded', 'object_name_length', 'day_of_week', 'bytes_transferred']
+    importance = [0.28, 0.22, 0.15, 0.10, 0.08, 0.06, 0.04, 0.03, 0.02, 0.01, 0.01]
+    colors_fi = [RED if i < 3 else ACCENT if i < 6 else MUTED for i in range(len(features))]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    fig.patch.set_facecolor(DARK); ax.set_facecolor(DARK)
+    bars = ax.barh(features[::-1], importance[::-1], color=colors_fi[::-1], alpha=0.85, zorder=3)
+    for bar, val in zip(bars, importance[::-1]):
+        ax.text(bar.get_width() + 0.003, bar.get_y() + bar.get_height()/2,
+                f'{val:.0%}', va='center', fontsize=8.5, color=TEXT)
+    ax.set_xlabel('Relative Importance', color=MUTED, fontsize=9)
+    ax.set_title('Feature Importance — Random Forest', color=TEXT, fontsize=12, fontweight='bold', pad=10)
+    ax.tick_params(colors=TEXT, labelsize=8.5)
+    ax.spines[:].set_color(BORDER)
+    ax.xaxis.grid(True, color=BORDER, linewidth=0.5, zorder=0)
+    ax.set_axisbelow(True)
+    patches = [mpatches.Patch(color=RED, label='Top features'),
+               mpatches.Patch(color=ACCENT, label='Mid features'),
+               mpatches.Patch(color=MUTED, label='Low features')]
+    ax.legend(handles=patches, facecolor=CARD, edgecolor=BORDER, labelcolor=TEXT, fontsize=8)
+    savefig('feature_importance.png')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11. Attack Phase Distribution (pie)
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_attack_phase_dist():
+    phases = ['STEALTH_OPERATION', 'EXFILTRATION', 'RECONNAISSANCE', 'TARGET_ACCESS', 'DATA_STAGING']
+    counts = [1336, 311, 29, 8, 2]
+    colors_pie = [PURPLE, RED, ORANGE, YELLOW, ACCENT]
+    explode = [0, 0.05, 0.05, 0.05, 0.05]
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    fig.patch.set_facecolor(DARK); ax.set_facecolor(DARK)
+    wedges, texts, autotexts = ax.pie(
+        counts, labels=None, colors=colors_pie, explode=explode,
+        autopct='%1.1f%%', startangle=140,
+        wedgeprops=dict(edgecolor=DARK, linewidth=1.5),
+        textprops=dict(color=TEXT, fontsize=9))
+    for at in autotexts:
+        at.set_fontsize(8); at.set_color(DARK)
+    ax.legend(wedges, [f'{p}  ({c:,})' for p, c in zip(phases, counts)],
+              loc='center left', bbox_to_anchor=(1, 0.5),
+              facecolor=CARD, edgecolor=BORDER, labelcolor=TEXT, fontsize=8.5)
+    ax.set_title('Attack Phase Distribution (1,686 total events)',
+                 color=TEXT, fontsize=12, fontweight='bold', pad=10)
+    savefig('attack_phase_dist.png')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. Dataset Distribution
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_dataset_dist():
+    labels = ['NORMAL', 'MULTIPLE_IP', 'BULK_DOWNLOAD', 'UNUSUAL_HOURS', 'SENSITIVE_FILE']
+    counts = [439, 34, 26, 21, 19]
+    colors_ds = [GREEN, ACCENT, RED, YELLOW, ORANGE]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
+    fig.patch.set_facecolor(DARK)
+    fig.suptitle('ML Dataset Distribution (945 samples combined)',
+                 color=TEXT, fontsize=12, fontweight='bold')
+
+    # Bar chart
+    ax1.set_facecolor(DARK)
+    bars = ax1.bar(labels, counts, color=colors_ds, alpha=0.85, zorder=3)
+    for bar, cnt in zip(bars, counts):
+        ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 4,
+                 str(cnt), ha='center', fontsize=9, color=TEXT)
+    ax1.set_ylabel('Sample Count', color=MUTED, fontsize=9)
+    ax1.set_title('Label Distribution', color=TEXT, fontsize=10, pad=8)
+    ax1.tick_params(colors=TEXT, labelsize=7.5, axis='x', rotation=15)
+    ax1.tick_params(colors=MUTED, axis='y')
+    ax1.spines[:].set_color(BORDER)
+    ax1.yaxis.grid(True, color=BORDER, linewidth=0.5, zorder=0)
+    ax1.set_axisbelow(True)
+
+    # Train/test split donut
+    ax2.set_facecolor(DARK)
+    split_vals = [756, 189]
+    split_colors = [ACCENT, ORANGE]
+    wedges, texts, autotexts = ax2.pie(
+        split_vals, labels=['Train (756)', 'Test (189)'],
+        colors=split_colors, autopct='%1.0f%%', startangle=90,
+        wedgeprops=dict(width=0.5, edgecolor=DARK, linewidth=2),
+        textprops=dict(color=TEXT, fontsize=9))
+    for at in autotexts:
+        at.set_color(DARK); at.set_fontsize(9)
+    ax2.set_title('Train / Test Split (80/20 stratified)', color=TEXT, fontsize=10, pad=8)
+
+    plt.tight_layout()
+    savefig('dataset_distribution.png')
+
+
 if __name__ == '__main__':
     print('Generating diagrams...')
     fig_pipeline()
@@ -403,4 +607,10 @@ if __name__ == '__main__':
     fig_ml_performance()
     fig_attack_phases()
     fig_cross_source()
+    fig_user_risk()
+    fig_anomaly_breakdown()
+    fig_confusion_matrix()
+    fig_feature_importance()
+    fig_attack_phase_dist()
+    fig_dataset_dist()
     print(f'\nAll diagrams saved to docs/images/')
