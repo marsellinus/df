@@ -100,6 +100,12 @@ services:
       - ./logs:/app/logs
       - ./logs/nginx:/app/logs/nginx:ro
       - ./logs/nextcloud:/app/logs/nextcloud:ro
+      # Live code mounts — changes take effect on container restart (no rebuild needed)
+      - ./dashboard:/app/dashboard
+      - ./analysis:/app/analysis
+      - ./config:/app/config
+      - ./scripts:/app/scripts
+      - ./main.py:/app/main.py
     ports:
       - "5002:5002"
     networks:

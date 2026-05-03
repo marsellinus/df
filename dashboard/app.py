@@ -4,6 +4,8 @@ import json
 import logging
 import subprocess
 import sys
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -20,8 +22,39 @@ from analysis.risk_engine import compute_risk_scores
 
 logger = ForensicLogger.setup_logger('dashboard', LOG_DIR / 'dashboard.log')
 app = Flask(__name__, template_folder='templates', static_folder='static')
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.secret_key = 'forensic-secret-2024'
 db = DatabaseHelper(DATA_DIR / 'forensic.db')
+
+_pipeline_lock = threading.Lock()
+
+
+def _run_pipeline_and_save():
+    """Run full forensic pipeline and persist report. Thread-safe."""
+    if not _pipeline_lock.acquire(blocking=False):
+        return  # already running
+    try:
+        from main import run_pipeline
+        logs = get_all_parsed_logs()
+        report = run_pipeline(logs)
+        out = DATA_DIR / 'forensic_report.json'
+        out.write_text(json.dumps(report, indent=2, default=str))
+        logger.info(f"Pipeline refreshed: {len(logs)} events")
+    except Exception as e:
+        logger.error(f"Pipeline refresh error: {e}")
+    finally:
+        _pipeline_lock.release()
+
+
+def _background_refresh(interval: int = 30):
+    """Background thread: refresh pipeline every `interval` seconds."""
+    while True:
+        time.sleep(interval)
+        _run_pipeline_and_save()
+
+
+# Start background refresh thread
+threading.Thread(target=_background_refresh, args=(30,), daemon=True).start()
 
 USERS = {'admin': 'forensic2024', 'analyst': 'analyst123'}
 SEV_ORDER = {'LOW': 1, 'MEDIUM': 2, 'HIGH': 3, 'CRITICAL': 4}
@@ -76,6 +109,48 @@ def get_stats():
 @app.route('/api/risk-score')
 def risk_score():
     try:
+        # Serve from cached report (updated by background pipeline every 30s)
+        cache_file = DATA_DIR / 'forensic_report.json'
+        if cache_file.exists():
+            data = json.loads(cache_file.read_text())
+            how_much = data.get('how_much', {})
+            how      = data.get('how', {})
+            return jsonify({
+                'session_risk_score': data.get('session_risk_score', 0),
+                'session_risk_band':  data.get('session_risk_band', 'SAFE'),
+                'user_scores': {
+                    uid: {
+                        'user_id':   uid,
+                        'risk_score': u.get('risk_score', 0),
+                        'risk_band':  u.get('risk_band', 'SAFE'),
+                        'signals':    how.get(uid, {}),
+                        'profile_summary': {
+                            'total_events':    u.get('total_events', 0),
+                            'get_count':       how_much.get(uid, {}).get('files_downloaded', 0),
+                            'bytes_total_mb':  how_much.get(uid, {}).get('bytes_total_mb', 0),
+                            'unique_ip_count': u.get('ips_used', 0),
+                            'sensitive_files': u.get('sensitive_files_accessed', []),
+                            'off_hours_events': how.get(uid, {}).get('off_hours_ratio', 0),
+                        },
+                    }
+                    for uid, u in data.get('who', {}).items()
+                },
+                'anomalies': [
+                    {
+                        'anomaly_type': a.get('type', ''),
+                        'severity':     a.get('severity', ''),
+                        'user_id':      a.get('user', ''),
+                        'source_ip':    '',
+                        'description':  a.get('description', ''),
+                        'evidence':     a.get('evidence', {}),
+                        'detected_at':  data.get('generated_at', ''),
+                    }
+                    for a in data.get('what', [])
+                ],
+                'timeline_summary': data.get('when', {}),
+                'total_logs': data.get('when', {}).get('total_events', 0),
+            })
+        # Fallback: compute live
         logs = get_all_parsed_logs()
         result = compute_risk_scores(logs)
         result['total_logs'] = len(logs)
@@ -88,9 +163,11 @@ def risk_score():
 @app.route('/api/reconstruction')
 def reconstruction():
     try:
+        cache_file = DATA_DIR / 'forensic_report.json'
+        if cache_file.exists():
+            return jsonify(json.loads(cache_file.read_text()))
         from main import run_pipeline
-        logs = get_all_parsed_logs()
-        report = run_pipeline(logs)
+        report = run_pipeline()
         return jsonify(report)
     except Exception as e:
         logger.error(f"reconstruction: {e}")
@@ -121,7 +198,7 @@ def logs_raw():
         user, ip = request.args.get('user'), request.args.get('ip')
         start, end = request.args.get('start'), request.args.get('end')
         operation = request.args.get('operation')
-        source    = request.args.get('source')  # cert_dataset / nextcloud / etc.
+        source    = request.args.get('source')
 
         if user:        logs = get_logs_for_user(user)
         elif ip:        logs = get_logs_for_ip(ip)
@@ -130,6 +207,10 @@ def logs_raw():
 
         if operation: logs = [l for l in logs if l.get('operation','').upper() == operation.upper()]
         if source:    logs = [l for l in logs if l.get('bucket','') == source]
+        
+        # Filter out background noise
+        if not user and not source:
+            logs = [l for l in logs if not (l.get('user_id') == 'unknown' and not l.get('object_name','').strip())]
 
         total = len(logs)
         offset = (page - 1) * per_page
@@ -156,24 +237,15 @@ def analysis_correlate():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/simulate', methods=['POST'])
-def simulate():
+
+
+
+@app.route('/api/pipeline/refresh', methods=['POST'])
+def pipeline_refresh():
+    """Trigger forensic pipeline immediately and return updated report."""
     try:
-        data     = request.get_json(silent=True) or {}
-        scenario = data.get('scenario', 'full')
-        attacker = data.get('attacker', 'attacker1')
-        files    = int(data.get('files', 5))
-        valid    = {'full','normal','bulk_download','multi_ip','off_hours','sensitive'}
-        if scenario not in valid:
-            return jsonify({'error': f'Choose from: {valid}'}), 400
-        script = Path(__file__).parent.parent / 'scripts' / 'attack_simulator.py'
-        proc = subprocess.Popen(
-            [sys.executable, str(script), scenario, '--attacker', attacker, '--files', str(files)],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        try: proc.communicate(timeout=2)
-        except subprocess.TimeoutExpired: pass
-        return jsonify({'status': 'started', 'scenario': scenario, 'attacker': attacker, 'pid': proc.pid})
+        threading.Thread(target=_run_pipeline_and_save, daemon=True).start()
+        return jsonify({'status': 'started', 'message': 'Pipeline refresh triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -218,14 +290,13 @@ def ml_predict():
 
 @app.route('/api/dataset/summary')
 def dataset_summary():
-    """Cross-source dataset breakdown: CERT vs Nextcloud."""
+    """Live traffic dataset breakdown."""
     try:
         logs = get_all_parsed_logs()
         sources = {}
         for l in logs:
             bucket = l.get('bucket') or ''
-            src = 'CERT-InsiderThreat' if 'cert' in bucket else \
-                  'Nextcloud' if bucket in ('nextcloud', '') else (bucket or 'Nextcloud')
+            src = 'Nextcloud' if bucket in ('nextcloud', '') else (bucket or 'Nextcloud')
             if src not in sources:
                 sources[src] = {'events': 0, 'users': set(), 'operations': {}}
             sources[src]['events'] += 1
@@ -249,33 +320,7 @@ def dataset_summary():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/dataset/cert-sample')
-def cert_sample():
-    """Generate and return CERT sample dataset info."""
-    try:
-        csv_path = DATA_DIR / 'cert_sample.csv'
-        if not csv_path.exists():
-            return jsonify({'error': 'cert_sample.csv not found. Run: python scripts/load_cert_dataset.py --sample'}), 404
-        import csv
-        rows = []
-        with open(csv_path) as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                rows.append(row)
-        users = {}
-        for r in rows:
-            u = r.get('user','')
-            if u not in users: users[u] = {'events':0,'exfil':0}
-            users[u]['events'] += 1
-            if r.get('to_removable_media','').lower() == 'true':
-                users[u]['exfil'] += 1
-        return jsonify({
-            'total_records': len(rows),
-            'users': users,
-            'sample': rows[:5],
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+
 
 
 # ── Utility APIs ──────────────────────────────────────────────────────────────
@@ -340,6 +385,10 @@ def system_metrics():
 @app.route('/health')
 def health():
     return jsonify({'status': 'healthy'})
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
 
 @app.errorhandler(404)
 def not_found(e): return jsonify({'error': 'Not found'}), 404

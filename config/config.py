@@ -49,8 +49,8 @@ ANOMALY_THRESHOLDS = {
 
 # ============ ATTACK SIMULATION CONFIG ============
 ATTACKER_USERS = {
-    'attacker1': 'password123',
-    'attacker2': 'password456',
+    'attacker1': 'attacker1_pass_123',
+    'attacker2': 'attacker2_pass_456',
 }
 
 NORMAL_USERS = {

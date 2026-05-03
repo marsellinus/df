@@ -137,9 +137,6 @@ def parse_log_file(path: Path) -> Iterator[Dict]:
         'generic_json':   parse_generic_json_log,
         'nc_nginx':       parse_nc_nginx_json,
         'nc_admin_audit': parse_nc_admin_audit,
-        'cert_csv':       parse_cert_file_csv,
-        'cert_logon':     parse_cert_logon_csv,
-        'cert_device':    parse_cert_device_csv,
     }
     parser = parsers.get(fmt, parse_generic_json_log)
     with open(path, 'r', errors='replace') as f:
@@ -341,151 +338,7 @@ def parse_nc_admin_audit(line: str) -> Optional[Dict]:
         return None
 
 
-def parse_cert_file_csv(line: str, _header: list = None) -> Optional[Dict]:
-    """
-    Parse satu baris dari CERT Insider Threat Dataset file.csv.
 
-    Format CSV (header): id,date,user,pc,filename,activity,
-                         to_removable_media,from_removable_media,content
-
-    Mapping ke schema forensik:
-      - date       → timestamp
-      - user       → user_id
-      - pc         → source_ip (dipakai sebagai host identifier)
-      - activity   → operation  (Open→GET, Copy→COPY, Write→PUT, Delete→DELETE)
-      - filename   → object_name
-      - to_removable_media=True → flag eksfiltrasi via USB
-    """
-    import csv as _csv
-    try:
-        row = next(_csv.reader([line]))
-        if not row or row[0].strip().lower() in ('id', ''):
-            return None  # skip header / empty
-
-        # Toleran terhadap jumlah kolom
-        def col(i, default=''):
-            return row[i].strip() if i < len(row) else default
-
-        date_str = col(1)
-        try:
-            # Format CERT: MM/DD/YYYY HH:MM:SS
-            ts = datetime.strptime(date_str, '%m/%d/%Y %H:%M:%S').isoformat()
-        except ValueError:
-            ts = datetime.now().isoformat()
-
-        activity = col(5).upper()
-        op_map = {'OPEN': 'GET', 'COPY': 'COPY', 'WRITE': 'PUT',
-                  'DELETE': 'DELETE', 'EXECUTE': 'EXECUTE'}
-        operation = op_map.get(activity, activity or 'GET')
-
-        # Tandai eksfiltrasi USB sebagai operasi khusus
-        if col(6).lower() == 'true':
-            operation = 'EXFIL_USB'
-
-        fname = col(4)
-        # Ambil nama file saja dari path Windows
-        object_name = fname.replace('\\', '/').split('/')[-1] if fname else ''
-
-        # Gunakan nama PC sebagai proxy source_ip (tidak ada IP di dataset CERT)
-        pc = col(3) or 'unknown'
-
-        return _record(
-            timestamp   = ts,
-            user_id     = col(2) or 'unknown',
-            source_ip   = pc,
-            operation   = operation,
-            bucket      = 'cert_dataset',
-            object_name = object_name,
-            file_size   = 0,
-            status_code = 200,
-            user_agent  = 'CERT-Dataset/r4.2',
-            raw         = line.strip(),
-        )
-    except Exception:
-        return None
-
-
-def parse_cert_logon_csv(line: str) -> Optional[Dict]:
-    """
-    Parse CERT Insider Threat Dataset logon.csv.
-
-    Format CSV (header): id,date,user,pc,activity
-    activity: Logon / Logoff
-    """
-    import csv as _csv
-    try:
-        row = next(_csv.reader([line]))
-        if not row or row[0].strip().lower() in ('id', ''):
-            return None
-
-        def col(i, default=''):
-            return row[i].strip() if i < len(row) else default
-
-        try:
-            ts = datetime.strptime(col(1), '%m/%d/%Y %H:%M:%S').isoformat()
-        except ValueError:
-            ts = datetime.now().isoformat()
-
-        activity = col(4).upper()
-        op_map = {'LOGON': 'LOGIN_SUCCESS', 'LOGOFF': 'LOGOUT',
-                  'FAILED LOGON': 'LOGIN_FAILED'}
-        operation = op_map.get(activity, activity or 'LOGIN_SUCCESS')
-
-        return _record(
-            timestamp   = ts,
-            user_id     = col(2) or 'unknown',
-            source_ip   = col(3) or 'unknown',  # PC name as host
-            operation   = operation,
-            bucket      = 'cert_logon',
-            object_name = '',
-            file_size   = 0,
-            status_code = 200,
-            user_agent  = 'CERT-Dataset/r4.2',
-            raw         = line.strip(),
-        )
-    except Exception:
-        return None
-
-
-def parse_cert_device_csv(line: str) -> Optional[Dict]:
-    """
-    Parse CERT Insider Threat Dataset device.csv.
-
-    Format CSV (header): id,date,user,pc,activity
-    activity: Connect / Disconnect
-    """
-    import csv as _csv
-    try:
-        row = next(_csv.reader([line]))
-        if not row or row[0].strip().lower() in ('id', ''):
-            return None
-
-        def col(i, default=''):
-            return row[i].strip() if i < len(row) else default
-
-        try:
-            ts = datetime.strptime(col(1), '%m/%d/%Y %H:%M:%S').isoformat()
-        except ValueError:
-            ts = datetime.now().isoformat()
-
-        activity = col(4).upper()
-        op_map = {'CONNECT': 'USB_CONNECT', 'DISCONNECT': 'USB_DISCONNECT'}
-        operation = op_map.get(activity, activity or 'USB_CONNECT')
-
-        return _record(
-            timestamp   = ts,
-            user_id     = col(2) or 'unknown',
-            source_ip   = col(3) or 'unknown',
-            operation   = operation,
-            bucket      = 'cert_device',
-            object_name = 'removable_media',
-            file_size   = 0,
-            status_code = 200,
-            user_agent  = 'CERT-Dataset/r4.2',
-            raw         = line.strip(),
-        )
-    except Exception:
-        return None
 
 
 def _detect_format(path: Path) -> str:
@@ -494,27 +347,12 @@ def _detect_format(path: Path) -> str:
     # Filename-based hints
     if 'admin_audit' in name:
         return 'nc_admin_audit'
-    if name == 'logon.csv' or 'cert_logon' in name:
-        return 'cert_logon'
-    if name == 'device.csv' or 'cert_device' in name:
-        return 'cert_device'
-    if 'cert' in name or name in ('file.csv', 'http.csv', 'email.csv'):
-        return 'cert_csv'
 
     with open(path, 'r', errors='replace') as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            # CERT CSV header detection
-            if line.lower().startswith('id,date,user'):
-                cols = line.lower()
-                if 'filename' in cols:
-                    return 'cert_csv'
-                if 'activity' in cols and 'pc' in cols:
-                    # logon and device share same header shape — default to logon
-                    return 'cert_logon'
-                return 'cert_csv'
             if line.startswith('{'):
                 d = json.loads(line)
                 if 'request_method' in d and 'remote_addr' in d:

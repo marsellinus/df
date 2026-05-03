@@ -133,6 +133,15 @@ def compute_risk_scores(logs: List[Dict] = None) -> Dict:
             'total_logs': 0,
         }
 
+    # Filter noise: unknown users with no object (browser/background requests)
+    # and CERT historical dataset (not part of current investigation)
+    CERT_BUCKETS = {'cert_dataset', 'cert_logon', 'cert_device'}
+    logs = [
+        l for l in logs
+        if not (l.get('user_id') == 'unknown' and not l.get('object_name', '').strip())
+        and l.get('bucket', '') not in CERT_BUCKETS
+    ]
+
     # Step 1 – Correlate metadata
     correlation = correlate(logs)
     user_profiles = correlation['user_profiles']

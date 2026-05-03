@@ -51,17 +51,24 @@ def reconstruct(
     user_filter: Optional[str] = None,
     start: Optional[str] = None,
     end: Optional[str] = None,
+    include_cert: bool = False,
 ) -> List[Dict]:
     """
     Build a sorted, enriched timeline from logs + anomalies.
 
     Parameters
     ----------
-    logs       : normalised log records
-    anomalies  : detected anomaly records
-    user_filter: restrict to a single user_id
-    start/end  : ISO timestamp strings for time-range filter
+    logs         : normalised log records
+    anomalies    : detected anomaly records
+    user_filter  : restrict to a single user_id
+    start/end    : ISO timestamp strings for time-range filter
+    include_cert : include CERT historical dataset (default False — keeps
+                   timeline timestamps in the current investigation period)
     """
+    # Exclude CERT historical data from realtime timeline unless requested
+    CERT_BUCKETS = {'cert_dataset', 'cert_logon', 'cert_device'}
+    if not include_cert:
+        logs = [l for l in logs if l.get('bucket', '') not in CERT_BUCKETS]
     # Build per-user anomaly-type index
     user_anomaly_types: Dict[str, set] = {}
     for a in anomalies:
